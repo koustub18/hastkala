@@ -29,61 +29,66 @@ export const getMarketPricingContext = async (productData) => {
 };
 
 export const generatePricingAnalysis = async (productData, marketContext) => {
-  // TODO: Integrate actual AI provider (e.g., Vertex AI, OpenAI) here.
-  // The backend/cloud function should handle the secure API calls.
-  // For now, this is a RULE-BASED FALLBACK Engine.
-  
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const baseCost = Number(productData.rawMaterialCost) || 0;
-      const laborCost = Number(productData.laborCost) || 0;
-      const additionalCost = Number(productData.additionalCost) || 0;
-      const totalCost = baseCost + laborCost + additionalCost;
-      
-      let recommended = 0;
-      let suggestedMin = 0;
-      let suggestedMax = 0;
-      let confidence = "Medium";
-      let factors = ["Raw Material Cost", "Labor Cost", "Category Markup"];
+  try {
+    const response = await fetch('/api/ai/pricing', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        title: productData.title || productData.name || '',
+        category: productData.category || '',
+        description: productData.description || '',
+        rawMaterialCost: productData.rawMaterialCost || 0,
+        laborCost: productData.laborCost || 0,
+        additionalCost: productData.additionalCost || 0,
+        imageUrl: productData.image || null
+      })
+    });
 
-      // Basic fallback heuristic
-      if (totalCost > 0) {
-        suggestedMin = Math.round(totalCost * 1.3);
-        suggestedMax = Math.round(totalCost * 1.8);
-        recommended = Math.round(totalCost * 1.5);
-      } else if (marketContext.contextProvided) {
-        // Fallback to market average if no costs provided
-        recommended = marketContext.averageMarketPrice;
-        suggestedMin = Math.round(recommended * 0.8);
-        suggestedMax = Math.round(recommended * 1.2);
-        factors = ["Market Average", "Demand Trend"];
-        confidence = "Low";
-      } else {
-        recommended = 500;
-        suggestedMin = 400;
-        suggestedMax = 600;
-        factors = ["Default Pricing"];
-        confidence = "Very Low";
-      }
+    if (!response.ok) {
+      throw new Error(`AI Pricing API returned status ${response.status}`);
+    }
 
-      // Adjust based on market context
-      if (marketContext.demandTrend === 'High') {
-        recommended = Math.round(recommended * 1.1);
-        suggestedMax = Math.round(suggestedMax * 1.1);
-        factors.push("High Market Demand");
-      }
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error generating AI pricing analysis:', error);
+    
+    // Fallback if backend AI fails
+    const baseCost = Number(productData.rawMaterialCost) || 0;
+    const laborCost = Number(productData.laborCost) || 0;
+    const additionalCost = Number(productData.additionalCost) || 0;
+    const totalCost = baseCost + laborCost + additionalCost;
+    
+    let recommended = 0;
+    let suggestedMin = 0;
+    let suggestedMax = 0;
 
-      resolve({
-        priceRangeMin: suggestedMin,
-        priceRangeMax: suggestedMax,
-        recommendedPrice: recommended,
-        confidence: confidence,
-        explanation: "This is a basic cost-plus estimation because the AI ML model is not yet connected. It considers your base costs and current market trends.",
-        factors: factors,
-        engineStatus: "Pricing Engine — Demo/Fallback"
-      });
-    }, 1500);
-  });
+    if (totalCost > 0) {
+      suggestedMin = Math.round(totalCost * 1.3);
+      suggestedMax = Math.round(totalCost * 1.8);
+      recommended = Math.round(totalCost * 1.5);
+    } else if (marketContext.contextProvided) {
+      recommended = marketContext.averageMarketPrice;
+      suggestedMin = Math.round(recommended * 0.8);
+      suggestedMax = Math.round(recommended * 1.2);
+    } else {
+      recommended = 500;
+      suggestedMin = 400;
+      suggestedMax = 600;
+    }
+
+    return {
+      priceRangeMin: suggestedMin,
+      priceRangeMax: suggestedMax,
+      recommendedPrice: recommended,
+      confidence: "Very Low",
+      explanation: "AI pricing service is currently unavailable. Displaying basic cost-plus estimation.",
+      factors: ["Fallback Engine"],
+      engineStatus: "Pricing Engine — Fallback Mode"
+    };
+  }
 };
 
 export const getPriceSuggestion = async (productData) => {

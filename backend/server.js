@@ -12,6 +12,7 @@ const adminRoutes = require('./routes/admin');
 const truthmarkRoutes = require('./routes/truthmark');
 const ipshieldRoutes = require('./routes/ipshield');
 const uploadRoutes = require('./routes/upload');
+const aiRoutes = require('./routes/ai');
 const path = require('path');
 const fs = require('fs');
 
@@ -61,6 +62,7 @@ app.use('/api/truthmark', truthmarkRoutes);
 app.use('/api/verify', truthmarkRoutes);
 app.use('/api/ipshield', ipshieldRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Serve static files for QR codes and uploads
 app.use('/qrcodes', express.static(path.join(__dirname, 'qrcodes')));
