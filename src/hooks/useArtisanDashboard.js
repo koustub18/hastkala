@@ -19,7 +19,10 @@ const useArtisanDashboard = () => {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [newProduct, setNewProduct] = useState({
     title: '', category: CATEGORIES[0],
-    material: '', image: '', image2: ''
+    material: '', description: '', 
+    rawMaterialCost: '', laborCost: '', additionalCost: '',
+    price: '', aiSuggestedPrice: null, priceRangeMin: null, priceRangeMax: null, aiPricingConfidence: '', aiPricingExplanation: '', aiPricingFactors: [], pricingUpdatedAt: null,
+    image: '', image2: ''
   });
 
   const [showIPShield, setShowIPShield] = useState(false);
@@ -56,16 +59,23 @@ const useArtisanDashboard = () => {
   }, [navigate]);
 
   const uploadImage = async (file, field) => {
+    console.log(`uploadImage called for field ${field} with file:`, file);
     setImageUploading(prev => ({ ...prev, [field]: true }));
     try {
-      if (!userUid) throw new Error("Not authenticated");
+      if (!userUid) {
+        console.error("userUid is missing!");
+        throw new Error("Not authenticated");
+      }
       const storageRef = ref(storage, `products/${userUid}/${Date.now()}_${file.name}`);
+      console.log("Uploading bytes to storageRef:", storageRef.fullPath);
       await uploadBytes(storageRef, file);
+      console.log("Bytes uploaded, getting download URL...");
       const url = await getDownloadURL(storageRef);
+      console.log("Got download URL:", url);
       setNewProduct(p => ({ ...p, [field]: url }));
     } catch (err) {
-      console.error('Upload failed:', err);
-      toast.error('Could not upload image.');
+      console.error('Upload failed with error:', err);
+      toast.error('Could not upload image. Please try again.');
     } finally {
       setImageUploading(prev => ({ ...prev, [field]: false }));
     }
@@ -133,6 +143,18 @@ const useArtisanDashboard = () => {
       title: prod.title || '',
       category: prod.category || CATEGORIES[0],
       material: prod.material || '',
+      description: prod.description || '',
+      rawMaterialCost: prod.rawMaterialCost || '',
+      laborCost: prod.laborCost || '',
+      additionalCost: prod.additionalCost || '',
+      price: prod.price || '',
+      aiSuggestedPrice: prod.aiSuggestedPrice || null,
+      priceRangeMin: prod.priceRangeMin || null,
+      priceRangeMax: prod.priceRangeMax || null,
+      aiPricingConfidence: prod.aiPricingConfidence || '',
+      aiPricingExplanation: prod.aiPricingExplanation || '',
+      aiPricingFactors: prod.aiPricingFactors || [],
+      pricingUpdatedAt: prod.pricingUpdatedAt || null,
       image: prod.image || '',
       image2: prod.image2 || ''
     });
