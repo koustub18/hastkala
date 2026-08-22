@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-earth-50 text-earth-900 font-sans overflow-x-hidden;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif;
+  }
+}
+
+@layer utilities {
+  .glass-effect {
+    @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-xl;
+  }
+  
+  .glass-effect-dark {
+    @apply bg-earth-900/80 backdrop-blur-md border border-earth-700/50 shadow-xl;
+  }
+
+  /* Shimmer Effect for Loading or Premium Highlights */
+  .shimmer-bg {
+    background: linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.4) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2.5s infinite linear;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  .premium-shadow {
+    box-shadow: 0 20px 40px -10px rgba(90, 57, 43, 0.15), 0 10px 20px -5px rgba(90, 57, 43, 0.1);
+  }
+
+  .premium-gradient {
+    background: linear-gradient(135deg, theme('colors.earth.50') 0%, theme('colors.earth.100') 100%);
+  }
+  
+  .text-gradient {
+    background: linear-gradient(to right, theme('colors.earth.900'), theme('colors.terracotta.700'));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .no-scrollbar::-webkit-scrollbar {
+      display: none;
+  }
+
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .no-scrollbar {
+      -ms-overflow-style: none;  /* IE and Edge */
+      scrollbar-width: none;  /* Firefox */
+  }
+}
