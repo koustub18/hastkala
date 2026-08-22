@@ -2,7 +2,7 @@ import { useState } from 'react';
 // eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, AlertCircle, Loader2, Mail, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { signInWithEmailAndPassword } from 'firebase/auth';
@@ -101,14 +101,14 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-earth-50 flex items-center justify-center pt-32 pb-12 px-6">
+    <div className="min-h-screen bg-earth-50 flex items-center justify-center pt-24 pb-12 px-6">
       {/* Background Decorative */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-terracotta-200/40 blur-3xl" />
         <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full bg-forest-200/40 blur-3xl" />
       </div>
 
-      <div className="w-full max-w-5xl bg-white rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden relative z-10 border border-earth-100">
+      <div className="w-full max-w-5xl bg-white rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden relative z-10 border border-earth-100 my-8">
         
         {/* Left Side - Image/Branding */}
         <div className="md:w-5/12 bg-earth-900 text-earth-50 flex flex-col justify-between p-10 relative overflow-hidden hidden md:flex">
@@ -132,10 +132,10 @@ const Login = () => {
             </Link>
             
             <h2 className="text-4xl font-serif font-bold leading-snug mb-4">
-              Artisan Virtual Manager
+              Welcome Back
             </h2>
             <p className="text-earth-300 font-light text-lg">
-              Manage your craft, digitize your catalog, and track your business insights securely.
+              Continue your journey with India's premium heritage craftsmanship platform.
             </p>
           </div>
           
@@ -148,23 +148,21 @@ const Login = () => {
         </div>
 
         {/* Right Side - Form */}
-        <div className="md:w-7/12 p-10 lg:p-16 flex flex-col relative bg-white">
-          <Link to="/" className="absolute top-8 left-8 text-earth-400 hover:text-earth-800 transition-colors flex items-center gap-2 text-sm font-medium md:hidden">
+        <div className="md:w-7/12 p-8 lg:p-12 flex flex-col relative bg-white h-full overflow-y-auto max-h-[85vh] no-scrollbar">
+          <Link to="/" className="text-earth-400 hover:text-earth-800 transition-colors flex items-center gap-2 text-sm font-medium w-fit mb-6 md:hidden">
             <ArrowLeft size={16} /> Back
           </Link>
 
-          <div className="mb-10 text-center">
+          <div className="mb-10 text-center mt-2 md:mt-0">
             <h3 className="text-2xl font-serif font-bold text-earth-900 mb-2">Welcome to Hastkala</h3>
             <p className="text-earth-500 text-sm">Please sign in to your account</p>
           </div>
-
-          {/* Toggle Switch Removed */}
 
           <form onSubmit={handleLogin} className="flex flex-col gap-5 flex-1 justify-center">
             
             <button 
               type="button" 
-              className="w-full flex items-center justify-center py-3.5 border border-earth-300 rounded text-earth-700 font-medium hover:bg-earth-50 transition-colors"
+              className="w-full flex items-center justify-center py-3.5 border border-earth-300 rounded text-earth-700 font-medium hover:bg-earth-50 transition-colors shadow-sm"
             >
               <GoogleIcon />
               Continue with Google
@@ -172,11 +170,10 @@ const Login = () => {
             
             <div className="flex items-center my-2">
               <div className="flex-1 h-px bg-earth-200" />
-              <span className="px-4 text-xs font-medium text-earth-400 uppercase">or sign in with email</span>
+              <span className="px-4 text-xs font-medium text-earth-400 uppercase tracking-widest">or sign in with email</span>
               <div className="flex-1 h-px bg-earth-200" />
             </div>
 
-            {/* ── IMPROVEMENT 3: Styled Error Banner (not plain red text) ── */}
             {error && (
               <motion.div
                 initial={{ opacity: 0, y: -8 }}
@@ -188,35 +185,38 @@ const Login = () => {
               </motion.div>
             )}
 
-            <div>
+            <div className="relative">
               <label className="block text-xs font-bold text-earth-700 uppercase tracking-wider mb-2">Email Address</label>
-              <input 
-                type="email" 
-                className="w-full px-4 py-3 bg-earth-50 border border-earth-200 rounded focus:outline-none focus:border-terracotta-500 focus:ring-1 focus:ring-terracotta-500 transition-all text-earth-900"
-                placeholder="name@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-              />
+              <div className="relative">
+                <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-earth-400 pointer-events-none" />
+                <input 
+                  type="email" 
+                  className="w-full pl-11 pr-4 py-3 bg-earth-50 border border-earth-200 rounded focus:outline-none focus:border-terracotta-500 focus:ring-1 focus:ring-terracotta-500 transition-all text-earth-900"
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                />
+              </div>
             </div>
 
-            <div>
+            <div className="relative">
               <div className="flex justify-between items-center mb-2">
                 <label className="block text-xs font-bold text-earth-700 uppercase tracking-wider">Password</label>
                 <button
                   type="button"
                   onClick={handleForgotPassword}
-                  className="text-xs font-medium text-terracotta-600 hover:text-terracotta-800 transition-colors"
+                  className="text-xs font-bold text-terracotta-600 hover:text-terracotta-800 transition-colors tracking-wide"
                 >
                   Forgot password?
                 </button>
               </div>
-              {/* ── IMPROVEMENT 2: Show / Hide Password Toggle ── */}
               <div className="relative">
+                <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-earth-400 pointer-events-none" />
                 <input 
                   type={showPassword ? 'text' : 'password'}
-                  className="w-full px-4 py-3 pr-12 bg-earth-50 border border-earth-200 rounded focus:outline-none focus:border-terracotta-500 focus:ring-1 focus:ring-terracotta-500 transition-all text-earth-900"
+                  className="w-full pl-11 pr-12 py-3 bg-earth-50 border border-earth-200 rounded focus:outline-none focus:border-terracotta-500 focus:ring-1 focus:ring-terracotta-500 transition-all text-earth-900"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -226,7 +226,7 @@ const Login = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-earth-400 hover:text-earth-700 transition-colors p-1"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-earth-400 hover:text-earth-700 transition-colors p-1"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -246,7 +246,7 @@ const Login = () => {
                   Signing in…
                 </>
               ) : (
-                'Sign In to Virtual Manager'
+                'Sign In to Hastkala'
               )}
             </button>
           </form>
