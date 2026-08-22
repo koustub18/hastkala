@@ -139,7 +139,7 @@ const Navbar = () => {
 
         {/* Mobile Menu Button */}
         <button 
-          className={`md:hidden p-2 transition-colors ${isScrolled ? 'text-earth-800' : 'text-white'}`}
+          className={`md:hidden p-2 transition-colors ${(isScrolled || !isHomePage) ? 'text-earth-800' : 'text-white'}`}
           onClick={() => setMobileMenuOpen(true)}
         >
           <Menu size={24} strokeWidth={1.5} />

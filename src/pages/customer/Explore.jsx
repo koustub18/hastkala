@@ -38,7 +38,7 @@ const Explore = () => {
               className="w-full pl-12 pr-4 py-3 bg-earth-50 rounded-xl border-none focus:ring-2 focus:ring-terracotta-500 outline-none transition-shadow text-earth-900"
             />
           </div>
-          <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 hide-scrollbar">
+          <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 no-scrollbar">
             {categories.map(category => (
               <button
                 key={category}
