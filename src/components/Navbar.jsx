@@ -111,10 +111,10 @@ const Navbar = () => {
             </Link>
           )}
 
-          {userRole && (
+          {userRole ? (
             <button 
               onClick={handleLogout}
-              className={`text-[11px] font-bold uppercase tracking-widest px-4 py-2 rounded border transition-all ${
+              className={`text-[11px] font-bold uppercase tracking-widest px-4 py-2 rounded-full border transition-all ${
                 (isScrolled || !isHomePage)
                   ? 'border-terracotta-200 text-terracotta-600 hover:bg-terracotta-50' 
                   : 'border-white/30 text-white hover:bg-white/10'
@@ -122,6 +122,17 @@ const Navbar = () => {
             >
               Sign Out
             </button>
+          ) : (
+            <Link 
+              to="/login"
+              className={`text-[11px] font-bold uppercase tracking-widest px-6 py-2.5 rounded-full transition-all shadow-md hover:shadow-lg ${
+                (isScrolled || !isHomePage)
+                  ? 'bg-terracotta-600 text-white hover:bg-terracotta-700' 
+                  : 'bg-white text-earth-900 hover:bg-earth-50'
+              }`}
+            >
+              Sign In
+            </Link>
           )}
         </div>
 

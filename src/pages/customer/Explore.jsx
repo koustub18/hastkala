@@ -43,10 +43,10 @@ const Explore = () => {
               <button
                 key={category}
                 onClick={() => setSelectedCategory(category)}
-                className={`whitespace-nowrap px-5 py-2.5 rounded-full font-medium transition-colors ${
+                className={`whitespace-nowrap px-5 py-2.5 rounded-full font-bold uppercase tracking-wider text-xs transition-colors ${
                   selectedCategory === category 
-                    ? 'bg-forest-700 text-white' 
-                    : 'bg-earth-100 text-earth-700 hover:bg-earth-200'
+                    ? 'bg-terracotta-600 text-white shadow-md' 
+                    : 'bg-white text-earth-600 hover:bg-earth-100 border border-earth-200'
                 }`}
               >
                 {category}
@@ -66,11 +66,11 @@ const Explore = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {filteredProducts.map((product, index) => (
               <motion.div 
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: index * 0.05 }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
                 key={product.id} 
-                className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow group"
+                className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 group border border-earth-100/50 hover:-translate-y-1"
               >
                 <Link to={`/products/${product.id}`}>
                   <div className="relative aspect-[4/5] overflow-hidden bg-earth-100">

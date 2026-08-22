@@ -68,14 +68,15 @@ const ProductDetails = () => {
   return (
     <div className="min-h-screen bg-earth-50 pt-24 pb-20 px-4 md:px-8">
       <div className="max-w-6xl mx-auto">
-        <Link to="/explore" className="inline-flex items-center gap-2 text-earth-600 hover:text-forest-700 mb-8 font-medium transition-colors">
-          <ArrowLeft size={20} /> Back to explore
+        <Link to="/explore" className="inline-flex items-center gap-2 text-earth-500 hover:text-terracotta-600 mb-8 font-bold uppercase tracking-wider text-sm transition-colors group">
+          <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" /> Back to explore
         </Link>
 
-        <div className="bg-white rounded-3xl overflow-hidden shadow-sm">
+        <div className="bg-white rounded-[2rem] overflow-hidden shadow-2xl shadow-earth-900/5 border border-earth-100/50">
           <div className="grid md:grid-cols-2 gap-0">
             {/* Image Gallery */}
-            <div className="bg-earth-100 p-8 flex flex-col items-center justify-center">
+            <div className="bg-gradient-to-br from-earth-50 to-earth-100 p-8 md:p-12 flex flex-col items-center justify-center border-r border-earth-100/50 relative">
+              <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/handmade-paper.png")' }}></div>
               <motion.div 
                 key={activeImage}
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -106,10 +107,10 @@ const ProductDetails = () => {
 
             {/* Product Info */}
             <div className="p-8 md:p-12 flex flex-col justify-center">
-              <div className="mb-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-forest-50 text-forest-700 text-sm font-semibold">
+              <div className="mb-4 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-terracotta-50 text-terracotta-700 text-xs font-bold uppercase tracking-widest">
                 <Tag size={14} /> {product.category || 'Handcrafted'}
               </div>
-              <h1 className="text-3xl md:text-5xl font-bold text-earth-900 font-serif mb-4">{product.title}</h1>
+              <h1 className="text-4xl md:text-5xl font-bold text-earth-900 font-serif mb-6 leading-tight">{product.title}</h1>
               
               <div className="flex items-center gap-4 mb-8 text-earth-600 border-b border-earth-100 pb-8">
                 <Link to={`/artisan/${product.artisanId || 'unknown'}`} className="flex items-center gap-2 hover:text-forest-700 transition-colors">
@@ -139,7 +140,7 @@ const ProductDetails = () => {
 
               <button 
                 onClick={() => setShowEnquiryForm(!showEnquiryForm)}
-                className="w-full bg-terracotta-600 hover:bg-terracotta-700 text-white py-4 rounded-xl font-semibold text-lg transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg hover:-translate-y-0.5"
+                className="w-full bg-terracotta-600 hover:bg-terracotta-700 text-white py-4 px-8 rounded-full font-bold uppercase tracking-widest text-sm transition-all flex items-center justify-center gap-3 shadow-lg hover:shadow-xl hover:-translate-y-1"
               >
                 <Mail size={20} /> Request to Purchase
               </button>

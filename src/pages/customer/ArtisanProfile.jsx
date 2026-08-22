@@ -35,12 +35,12 @@ const ArtisanProfile = () => {
         </Link>
 
         {/* Artisan Header */}
-        <div className="bg-white rounded-3xl overflow-hidden shadow-sm mb-12">
+        <div className="bg-white rounded-[2rem] overflow-hidden shadow-xl shadow-earth-900/5 mb-12 border border-earth-100/50">
           <div className="h-48 bg-forest-900 relative">
             <div className="absolute inset-0 bg-black/20"></div>
           </div>
           <div className="px-8 pb-8 pt-0 relative flex flex-col md:flex-row items-center md:items-end gap-6 -mt-16 md:-mt-12 text-center md:text-left">
-            <div className="w-32 h-32 rounded-full border-4 border-white bg-earth-100 flex flex-shrink-0 items-center justify-center text-earth-400 overflow-hidden relative z-10 shadow-md">
+            <div className="w-32 h-32 rounded-full border-4 border-white bg-earth-50 flex flex-shrink-0 items-center justify-center text-earth-400 overflow-hidden relative z-10 shadow-xl">
               <User size={48} />
             </div>
             <div className="flex-1 pb-2">
@@ -83,12 +83,12 @@ const ArtisanProfile = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {products.map((product, index) => (
               <motion.div 
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: index * 0.05 }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
                 key={product.id} 
-                className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow group"
+                className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 group border border-earth-100/50 hover:-translate-y-1"
               >
                 <Link to={`/products/${product.id}`}>
                   <div className="relative aspect-[4/5] overflow-hidden bg-earth-100">

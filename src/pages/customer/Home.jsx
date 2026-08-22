@@ -10,21 +10,29 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-earth-50">
       {/* Hero Section */}
-      <section className="relative h-[80vh] flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 bg-forest-900/40 z-10"></div>
+      <section className="relative h-[85vh] flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-earth-900/80 via-earth-900/40 to-earth-900/90 z-10"></div>
         <img 
           src="https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?auto=format&fit=crop&q=80" 
           alt="Artisan crafting" 
           className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="relative z-20 text-center px-4 max-w-4xl mx-auto">
+        <div className="relative z-20 text-center px-4 max-w-4xl mx-auto mt-16">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8 }}
+            className="mb-6 inline-block"
+          >
+            <span className="text-terracotta-400 font-bold tracking-[0.2em] uppercase text-sm border-b border-terracotta-400/50 pb-1">Heritage & Craft</span>
+          </motion.div>
           <motion.h1 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="text-4xl md:text-6xl font-bold text-white mb-6 font-serif"
+            transition={{ duration: 0.8, delay: 0.1 }}
+            className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-6 font-serif leading-tight text-shadow-sm"
           >
-            Discover Authentic Indian Craftsmanship
+            Discover Authentic <span className="text-transparent bg-clip-text bg-gradient-to-r from-terracotta-400 to-earth-200">Indian Craftsmanship</span>
           </motion.h1>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
@@ -50,14 +58,15 @@ const Home = () => {
       </section>
 
       {/* Featured Products */}
-      <section className="py-20 px-4 md:px-8 max-w-7xl mx-auto">
-        <div className="flex justify-between items-end mb-12">
-          <div>
-            <h2 className="text-3xl font-bold text-earth-900 font-serif mb-2">Featured Creations</h2>
-            <p className="text-earth-600">Handpicked masterpieces from our artisans</p>
+      <section className="py-24 px-4 md:px-8 max-w-7xl mx-auto">
+        <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
+          <div className="relative pl-6">
+            <div className="absolute left-0 top-0 bottom-0 w-1 bg-terracotta-500 rounded-full"></div>
+            <h2 className="text-3xl md:text-4xl font-bold text-earth-900 font-serif mb-3">Featured Creations</h2>
+            <p className="text-earth-600 text-lg">Handpicked masterpieces from our artisans</p>
           </div>
-          <Link to="/explore" className="text-forest-600 hover:text-forest-700 font-medium flex items-center gap-1 group">
-            View All <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+          <Link to="/explore" className="text-terracotta-600 hover:text-terracotta-700 font-bold uppercase tracking-wider text-sm flex items-center gap-2 group transition-colors">
+            View Collection <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
           </Link>
         </div>
 
@@ -71,12 +80,12 @@ const Home = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {products.map((product, index) => (
               <motion.div 
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
+                transition={{ duration: 0.6, delay: index * 0.1 }}
                 key={product.id} 
-                className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow group"
+                className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 group border border-earth-100/50 hover:-translate-y-1"
               >
                 <Link to={`/products/${product.id}`}>
                   <div className="relative aspect-[4/5] overflow-hidden bg-earth-100">
@@ -113,46 +122,55 @@ const Home = () => {
       </section>
 
       {/* Impact Section */}
-      <section className="bg-forest-900 text-white py-20 px-4 md:px-8">
-        <div className="max-w-7xl mx-auto">
+      <section className="bg-earth-900 text-earth-50 py-24 px-4 md:px-8 relative overflow-hidden">
+        {/* Decorative background elements */}
+        <div className="absolute top-0 left-0 w-64 h-64 bg-terracotta-900/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-forest-900/30 rounded-full blur-3xl translate-x-1/3 translate-y-1/3"></div>
+        
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-serif font-bold mb-4">Empowering Artisans</h2>
+            <p className="text-earth-300 max-w-2xl mx-auto text-lg">Your support helps sustain traditional crafts and builds a fairer economy for creators across India.</p>
+          </div>
+          
           <div className="grid md:grid-cols-3 gap-12 text-center">
             <motion.div 
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="flex flex-col items-center"
+              className="flex flex-col items-center p-8 rounded-3xl bg-earth-800/50 border border-earth-700/50 backdrop-blur-sm"
             >
-              <div className="bg-forest-800 p-4 rounded-2xl mb-6">
+              <div className="bg-terracotta-900/40 p-5 rounded-2xl mb-6 shadow-inner border border-terracotta-800/30">
                 <Users size={40} className="text-terracotta-400" />
               </div>
-              <h3 className="text-xl font-semibold mb-3">Direct Impact</h3>
-              <p className="text-forest-100/80">Every purchase directly supports marginalized artisans and their communities.</p>
+              <h3 className="text-xl font-bold mb-3 font-serif tracking-wide">Direct Impact</h3>
+              <p className="text-earth-300 leading-relaxed">Every purchase directly supports marginalized artisans and their communities.</p>
             </motion.div>
             <motion.div 
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.2 }}
-              className="flex flex-col items-center"
+              className="flex flex-col items-center p-8 rounded-3xl bg-earth-800/50 border border-earth-700/50 backdrop-blur-sm"
             >
-              <div className="bg-forest-800 p-4 rounded-2xl mb-6">
-                <ShieldCheck size={40} className="text-terracotta-400" />
+              <div className="bg-forest-900/40 p-5 rounded-2xl mb-6 shadow-inner border border-forest-800/30">
+                <ShieldCheck size={40} className="text-forest-400" />
               </div>
-              <h3 className="text-xl font-semibold mb-3">Verified Authenticity</h3>
-              <p className="text-forest-100/80">Our platform ensures all products are genuinely handcrafted by the artisans.</p>
+              <h3 className="text-xl font-bold mb-3 font-serif tracking-wide">Verified Authenticity</h3>
+              <p className="text-earth-300 leading-relaxed">Our platform ensures all products are genuinely handcrafted by the artisans.</p>
             </motion.div>
             <motion.div 
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.4 }}
-              className="flex flex-col items-center"
+              className="flex flex-col items-center p-8 rounded-3xl bg-earth-800/50 border border-earth-700/50 backdrop-blur-sm"
             >
-              <div className="bg-forest-800 p-4 rounded-2xl mb-6">
-                <ShoppingBag size={40} className="text-terracotta-400" />
+              <div className="bg-earth-700/40 p-5 rounded-2xl mb-6 shadow-inner border border-earth-600/30">
+                <ShoppingBag size={40} className="text-earth-200" />
               </div>
-              <h3 className="text-xl font-semibold mb-3">Fair Pricing</h3>
-              <p className="text-forest-100/80">AI-driven pricing insights ensure fair value for both creators and buyers.</p>
+              <h3 className="text-xl font-bold mb-3 font-serif tracking-wide">Fair Pricing</h3>
+              <p className="text-earth-300 leading-relaxed">AI-driven pricing insights ensure fair value for both creators and buyers.</p>
             </motion.div>
           </div>
         </div>

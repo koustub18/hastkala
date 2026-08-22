@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 const Footer = () => {
   return (
-    <footer className="bg-earth-900 pt-20 pb-10 border-t-8 border-terracotta-500">
+    <footer className="bg-earth-900 pt-20 pb-10 border-t-4 border-terracotta-600">
       <div className="container mx-auto px-6 lg:px-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8 mb-16">
           
@@ -73,7 +73,7 @@ const Footer = () => {
         {/* Bottom Bar */}
         <div className="border-t border-earth-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-earth-400 text-sm">
-            &copy; 2026 Hastkala. Built for TechSpire 1.0 Hackathon.
+            &copy; 2026 Hastkala. All rights reserved.
           </p>
           <div className="flex gap-6 text-sm">
             <Link to="/privacy" className="text-earth-400 hover:text-earth-200 transition-colors">Privacy Policy</Link>
