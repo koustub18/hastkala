@@ -44,7 +44,9 @@ const Navbar = () => {
   // Removed search and suggestions logic as it's not needed for the Virtual Manager
   
   const navLinks = [
-    { name: 'Dashboard', path: '/seller/dashboard' },
+    { name: 'Home', path: '/' },
+    { name: 'Explore', path: '/explore' },
+    ...(userRole === 'artisan' ? [{ name: 'Dashboard', path: '/seller/dashboard' }] : [])
   ];
 
   return (
@@ -61,7 +63,7 @@ const Navbar = () => {
     >
       <div className="container mx-auto px-6 lg:px-12 flex items-center justify-between gap-8 xl:gap-12">
         {/* Logo */}
-        <Link to={userRole ? "/seller/dashboard" : "/"} className="flex items-center gap-3 group">
+        <Link to="/" className="flex items-center gap-3 group">
           <motion.div 
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -98,14 +100,16 @@ const Navbar = () => {
 
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-6">
-          <Link 
-            to="/seller/dashboard" 
-            className={`transition-colors block ${(isScrolled || !isHomePage) ? 'text-earth-600 hover:text-terracotta-600' : 'text-earth-100 hover:text-white'}`}
-          >
-            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-              <User size={20} strokeWidth={2} />
-            </motion.div>
-          </Link>
+          {userRole === 'artisan' && (
+            <Link 
+              to="/seller/dashboard" 
+              className={`transition-colors block ${(isScrolled || !isHomePage) ? 'text-earth-600 hover:text-terracotta-600' : 'text-earth-100 hover:text-white'}`}
+            >
+              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                <User size={20} strokeWidth={2} />
+              </motion.div>
+            </Link>
+          )}
 
           {userRole && (
             <button 
@@ -158,17 +162,31 @@ const Navbar = () => {
               </div>
 
               <nav className="flex flex-col gap-6">
+                {navLinks.map((link) => (
+                  <Link
+                    key={link.name}
+                    to={link.path}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`font-serif text-xl tracking-wide transition-colors ${
+                      location.pathname === link.path ? 'text-terracotta-600 font-bold' : 'text-earth-700 hover:text-earth-900'
+                    }`}
+                  >
+                    {link.name}
+                  </Link>
+                ))}
               </nav>
               <div className="mt-auto flex flex-col gap-4 border-t border-earth-200/50 pt-8">
                 {userRole ? (
                   <>
-                    <Link 
-                      to="/seller/dashboard"
-                      onClick={() => setMobileMenuOpen(false)} 
-                      className="flex items-center gap-3 text-earth-700 font-bold uppercase tracking-wider text-sm w-full py-4 bg-white justify-center rounded-lg shadow-sm border border-earth-100"
-                    >
-                      <User size={18} /> My Dashboard
-                    </Link>
+                    {userRole === 'artisan' && (
+                      <Link 
+                        to="/seller/dashboard"
+                        onClick={() => setMobileMenuOpen(false)} 
+                        className="flex items-center gap-3 text-earth-700 font-bold uppercase tracking-wider text-sm w-full py-4 bg-white justify-center rounded-lg shadow-sm border border-earth-100"
+                      >
+                        <User size={18} /> My Dashboard
+                      </Link>
+                    )}
                     <button 
                       onClick={handleLogout} 
                       className="flex items-center gap-3 text-terracotta-600 font-bold uppercase tracking-wider text-sm w-full py-4 bg-earth-50 justify-center rounded-lg border border-terracotta-100"

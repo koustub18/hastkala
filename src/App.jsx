@@ -15,6 +15,12 @@ const PendingApproval = lazy(() => import('./pages/PendingApproval'));
 const ArtisanOnboarding = lazy(() => import('./pages/ArtisanOnboarding'));
 const ArtisanDashboard = lazy(() => import('./pages/ArtisanDashboard'));
 
+// Customer pages
+const Home = lazy(() => import('./pages/customer/Home'));
+const Explore = lazy(() => import('./pages/customer/Explore'));
+const ProductDetails = lazy(() => import('./pages/customer/ProductDetails'));
+const ArtisanProfile = lazy(() => import('./pages/customer/ArtisanProfile'));
+
 // Loading Spinner for Suspense
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-earth-50">
@@ -52,7 +58,10 @@ function App() {
           <Routes>
             {/* Public Routes */}
             <Route element={<MainLayout />}>
-              <Route path="/" element={<Navigate to="/login" replace />} />
+              <Route path="/" element={<Home />} />
+              <Route path="/explore" element={<Explore />} />
+              <Route path="/products/:productId" element={<ProductDetails />} />
+              <Route path="/artisan/:artisanId" element={<ArtisanProfile />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/pending" element={<PendingApproval />} />

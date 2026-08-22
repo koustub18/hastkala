@@ -33,6 +33,8 @@ const ArtisanDashboard = () => {
     );
   }
 
+  const [activeTab, setActiveTab] = React.useState('products');
+
   return (
     <div className="min-h-screen bg-earth-50 pb-20">
       <Navbar />
@@ -92,18 +94,74 @@ const ArtisanDashboard = () => {
 
        <div className="container mx-auto px-6 lg:px-12 mt-[-30px] relative z-10">
          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-           <EnquiriesCard totalEnquiries={dashboardState.artisan.metrics?.totalEnquiries || 24} />
+           <EnquiriesCard totalEnquiries={dashboardState.enquiries?.length || 0} />
            <ImpressionsCard profileViews={dashboardState.artisan.metrics?.profileViews || 156} />
            <ActiveListingsCard activeProducts={dashboardState.products?.length || 0} />
          </div>
 
          <div className="w-full mt-8">
-              <h2 className="text-2xl font-serif font-bold text-earth-900 mb-6">Your Live Products</h2>
+            <div className="flex items-center gap-6 border-b border-earth-200 mb-6">
+              <button
+                onClick={() => setActiveTab('products')}
+                className={`pb-3 text-lg font-bold font-serif transition-colors relative ${activeTab === 'products' ? 'text-earth-900' : 'text-earth-500 hover:text-earth-700'}`}
+              >
+                Your Live Products
+                {activeTab === 'products' && (
+                  <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-forest-600" />
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab('enquiries')}
+                className={`pb-3 text-lg font-bold font-serif transition-colors relative ${activeTab === 'enquiries' ? 'text-earth-900' : 'text-earth-500 hover:text-earth-700'}`}
+              >
+                Customer Enquiries
+                {dashboardState.enquiries?.length > 0 && (
+                  <span className="ml-2 bg-terracotta-100 text-terracotta-700 text-xs py-0.5 px-2 rounded-full">{dashboardState.enquiries.length}</span>
+                )}
+                {activeTab === 'enquiries' && (
+                  <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-forest-600" />
+                )}
+              </button>
+            </div>
+
+            {activeTab === 'products' ? (
               <ProductList 
                 products={dashboardState.products} 
                 startEditProduct={dashboardState.startEditProduct} 
                 deleteProduct={dashboardState.deleteProduct}
               />
+            ) : (
+              <div className="bg-white rounded-xl shadow-sm border border-earth-100 overflow-hidden">
+                {dashboardState.enquiries?.length === 0 ? (
+                  <div className="p-12 text-center text-earth-500">
+                    <p className="text-lg font-serif">No customer enquiries yet.</p>
+                    <p className="text-sm mt-2">When customers are interested in your products, their messages will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-earth-100">
+                    {dashboardState.enquiries?.map(enquiry => (
+                      <div key={enquiry._id} className="p-6 hover:bg-earth-50 transition-colors">
+                        <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-3">
+                          <div>
+                            <h3 className="font-bold text-earth-900">{enquiry.customerName}</h3>
+                            <a href={`mailto:${enquiry.customerEmail}`} className="text-sm text-forest-600 hover:underline">{enquiry.customerEmail}</a>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm text-earth-500 bg-earth-100 px-3 py-1 rounded-full">
+                              Product: <span className="font-medium text-earth-700">{enquiry.productTitle}</span>
+                            </span>
+                            <span className="text-xs text-earth-400">
+                              {enquiry.createdAt ? new Date(enquiry.createdAt.toDate()).toLocaleDateString() : 'Recent'}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-earth-700 bg-white border border-earth-100 p-4 rounded-lg mt-2">"{enquiry.message}"</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
          </div>
        </div>
 

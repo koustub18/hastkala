@@ -31,6 +31,7 @@ const ProductList = ({ products, startEditProduct, deleteProduct }) => {
            </div>
            <div className="flex flex-row md:flex-col gap-6 md:gap-1 text-sm text-earth-600">
              {product.material && <p>Material: <span className="font-bold text-earth-900">{product.material}</span></p>}
+             {product.price && <p className="flex items-center gap-0.5"><IndianRupee size={14} className="text-earth-500" /> <span className="font-bold text-earth-900">{product.price}</span></p>}
            </div>
            <div className="flex flex-col gap-2">
              <button 

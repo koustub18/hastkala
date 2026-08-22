@@ -16,6 +16,7 @@ const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedRole, setSelectedRole] = useState('customer'); // Default to customer
   const navigate = useNavigate();
 
   const getPasswordStrength = (pass) => {
@@ -55,7 +56,7 @@ const Signup = () => {
         displayName: name
       });
 
-      const role = 'artisan';
+      const role = selectedRole;
       
       await setDoc(doc(db, 'users', user.uid), {
         uid: user.uid,
@@ -68,14 +69,18 @@ const Signup = () => {
 
       // --- HACKATHON FIX: Set token for ProtectedRoute ---
       const payload = {
-        role: 'artisan',
-        status: 'active',
+        role: role,
+        status: role === 'customer' ? 'active' : 'pending',
         name: name
       };
       const dummyToken = 'header.' + btoa(JSON.stringify(payload)) + '.signature';
       localStorage.setItem('token', dummyToken);
 
-      navigate('/seller/onboarding');
+      if (role === 'artisan') {
+        navigate('/seller/onboarding');
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       console.error('Signup error:', err);
       let message = 'Registration failed. ' + err.message;
@@ -143,10 +148,30 @@ const Signup = () => {
 
           <div className="mb-8 text-center mt-8 md:mt-0">
             <h3 className="text-2xl font-serif font-bold text-earth-900 mb-2">Create your Account</h3>
-            <p className="text-earth-500 text-sm">Join thousands of artisans on the Virtual Manager</p>
+            <p className="text-earth-500 text-sm">Join the Hastkala community today</p>
           </div>
 
-          {/* Role Toggle Removed */}
+          {/* Role Toggle */}
+          <div className="flex bg-earth-100 p-1 rounded-lg mb-8">
+            <button
+              type="button"
+              onClick={() => setSelectedRole('customer')}
+              className={`flex-1 py-2 text-sm font-bold uppercase tracking-wider rounded-md transition-all ${
+                selectedRole === 'customer' ? 'bg-white text-earth-900 shadow' : 'text-earth-500 hover:text-earth-700'
+              }`}
+            >
+              I am a Buyer
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedRole('artisan')}
+              className={`flex-1 py-2 text-sm font-bold uppercase tracking-wider rounded-md transition-all ${
+                selectedRole === 'artisan' ? 'bg-white text-terracotta-600 shadow' : 'text-earth-500 hover:text-terracotta-500'
+              }`}
+            >
+              I am an Artisan
+            </button>
+          </div>
 
           <form onSubmit={handleSignup} className="flex flex-col gap-4">
 

@@ -11,6 +11,7 @@ const CATEGORIES = ['Textiles', 'Pottery', 'Decor', 'Paintings', 'Metalwork', 'J
 const useArtisanDashboard = () => {
   const [artisan, setArtisan] = useState(null);
   const [products, setProducts] = useState([]);
+  const [enquiries, setEnquiries] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -45,6 +46,16 @@ const useArtisanDashboard = () => {
           const querySnapshot = await getDocs(q);
           const productsList = querySnapshot.docs.map(d => ({ _id: d.id, ...d.data() }));
           setProducts(productsList);
+
+          const enquiriesQuery = query(collection(db, 'enquiries'), where("artisanId", "==", user.uid));
+          const enquiriesSnapshot = await getDocs(enquiriesQuery);
+          const enquiriesList = enquiriesSnapshot.docs.map(d => ({ _id: d.id, ...d.data() })).sort((a, b) => {
+            if (a.createdAt && b.createdAt) {
+              return b.createdAt.toMillis() - a.createdAt.toMillis();
+            }
+            return 0;
+          });
+          setEnquiries(enquiriesList);
         } catch (err) {
           console.error('Failed to fetch dashboard data', err);
         } finally {
@@ -179,7 +190,8 @@ const useArtisanDashboard = () => {
     handleAddProduct,
     deleteProduct,
     startEditProduct,
-    CATEGORIES
+    CATEGORIES,
+    enquiries
   };
 };
 

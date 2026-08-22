@@ -64,18 +64,20 @@ const Login = () => {
 
         toast.success(`Welcome back, ${userData.name?.split(' ')[0] || 'there'}! 👋`);
 
-        if (userData.role === 'artisan') {
+        if (userData.role === 'customer') {
+          navigate('/');
+        } else if (userData.role === 'artisan') {
           navigate(userData.hasOnboarded ? '/seller/dashboard' : '/seller/onboarding');
         } else {
-          navigate('/seller/dashboard'); // Fallback if no role defined
+          navigate('/'); // Fallback
         }
       } else {
          // --- HACKATHON FIX: Set token for ProtectedRoute ---
-         const payload = { role: 'artisan', status: 'active', name: 'Artisan' };
+         const payload = { role: 'customer', status: 'active', name: 'User' };
          localStorage.setItem('token', 'header.' + btoa(JSON.stringify(payload)) + '.signature');
          
          toast.success(`Welcome back! 👋`);
-         navigate('/seller/dashboard');
+         navigate('/');
       }
     } catch (err) {
       console.error(err);
