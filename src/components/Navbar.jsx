@@ -61,7 +61,7 @@ const Navbar = () => {
     >
       <div className="container mx-auto px-6 lg:px-12 flex items-center justify-between gap-8 xl:gap-12">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-3 group">
+        <Link to={userRole ? "/seller/dashboard" : "/"} className="flex items-center gap-3 group">
           <motion.div 
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
