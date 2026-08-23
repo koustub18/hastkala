@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { AuthProvider } from './contexts/AuthContext';
 import MainLayout from './components/layouts/MainLayout';
 import SellerLayout from './components/layouts/SellerLayout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -34,6 +35,7 @@ const PageLoader = () => (
 
 function App() {
   return (
+    <AuthProvider>
       <Router>
         <ScrollToTop />
         {/* Global Toast Notification System */}
@@ -102,6 +104,7 @@ function App() {
           </Routes>
         </Suspense>
       </Router>
+    </AuthProvider>
   );
 }
 

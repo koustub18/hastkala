@@ -53,15 +53,6 @@ const Login = () => {
       if (userDoc.exists()) {
         const userData = userDoc.data();
         
-        // --- HACKATHON FIX: Set token for ProtectedRoute ---
-        const payload = {
-          role: userData.role || 'artisan',
-          status: userData.status || (userData.role === 'customer' ? 'active' : 'pending'),
-          name: userData.name || 'Artisan'
-        };
-        const dummyToken = 'header.' + btoa(JSON.stringify(payload)) + '.signature';
-        localStorage.setItem('token', dummyToken);
-
         toast.success(`Welcome back, ${userData.name?.split(' ')[0] || 'there'}! 👋`);
 
         if (userData.role === 'customer') {
@@ -80,10 +71,6 @@ const Login = () => {
           navigate('/', { replace: true }); // Fallback
         }
       } else {
-         // --- HACKATHON FIX: Set token for ProtectedRoute ---
-         const payload = { role: 'customer', status: 'active', name: 'User' };
-         localStorage.setItem('token', 'header.' + btoa(JSON.stringify(payload)) + '.signature');
-         
          toast.success(`Welcome back! 👋`);
          navigate('/', { replace: true });
       }

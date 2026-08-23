@@ -68,15 +68,7 @@ const Signup = () => {
         hasOnboarded: false
       });
 
-      // --- HACKATHON FIX: Set token for ProtectedRoute ---
-      const payload = {
-        role: role,
-        status: role === 'customer' ? 'active' : 'pending',
-        name: name
-      };
-      const dummyToken = 'header.' + btoa(JSON.stringify(payload)) + '.signature';
-      localStorage.setItem('token', dummyToken);
-
+      // Wait briefly for AuthContext to potentially pick up the change, though we can navigate directly
       if (role === 'artisan') {
         navigate('/seller/onboarding', { replace: true });
       } else {

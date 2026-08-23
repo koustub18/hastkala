@@ -13,7 +13,6 @@ const AdminLayout = () => {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      localStorage.removeItem('token');
       toast.success('Admin logged out successfully');
       navigate('/login');
     } catch (error) {

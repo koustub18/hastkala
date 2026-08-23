@@ -1,10 +1,13 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Clock } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 const PendingApproval = () => {
-  const clearAuth = () => {
-    localStorage.removeItem('token');
+  const { logout } = useAuth();
+  
+  const clearAuth = async () => {
+    await logout();
   }
 
   return (

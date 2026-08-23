@@ -65,7 +65,6 @@ const ArtisanOnboarding = () => {
           }
         }, { merge: true });
       }
-      localStorage.setItem('hasOnboarded', 'true');
     } catch (err) {
       console.error('Failed to save profile', err);
     } finally {

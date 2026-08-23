@@ -3,33 +3,24 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, User, Heart, Search, IndianRupee } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { jwtDecode } from 'jwt-decode';
+import { useAuth } from '../contexts/AuthContext';
 
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
-  const [userRole, setUserRole] = useState(null);
+  const { user, userRole, logout } = useAuth();
   const isHomePage = location.pathname === '/';
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        const decoded = jwtDecode(token);
-        setUserRole(decoded.role);
-      } catch (err) {
-        console.error('Invalid token', err);
-      }
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setMobileMenuOpen(false);
+      navigate('/login');
+    } catch (err) {
+      console.error('Logout failed', err);
     }
-  }, [location]);
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    setUserRole(null);
-    setMobileMenuOpen(false);
-    window.location.href = '/login';
   };
 
 
