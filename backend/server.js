@@ -39,9 +39,7 @@ app.get('/', (req, res) => {
 app.use((err, req, res, next) => {
   console.error('🔥 [Global Error Handler]:', err.stack);
   res.status(err.status || 500).json({
-    message: err.message || 'Internal Server Error',
-    // Hide sensitive stack traces if in production mode
-    stack: process.env.NODE_ENV === 'production' ? null : err.stack
+    message: err.message || 'Internal Server Error'
   });
 });
 
