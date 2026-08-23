@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Users, Shield, Menu, X } from 'lucide-react';
+import { LogOut, Users, Shield, Menu, X, LayoutDashboard, UserCheck, Store, Package, MessageSquare, BarChart, User } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../utils/firebase';
 import toast from 'react-hot-toast';
@@ -21,7 +21,14 @@ const AdminLayout = () => {
   };
 
   const navItems = [
-    { name: 'Pending Artisans', path: '/admin', icon: Users },
+    { name: 'Overview', path: '/admin', icon: LayoutDashboard },
+    { name: 'Applications', path: '/admin/applications', icon: UserCheck },
+    { name: 'Artisans', path: '/admin/artisans', icon: Store },
+    { name: 'Products', path: '/admin/products', icon: Package },
+    { name: 'Enquiries', path: '/admin/enquiries', icon: MessageSquare },
+    { name: 'Users', path: '/admin/users', icon: Users },
+    { name: 'Analytics', path: '/admin/analytics', icon: BarChart },
+    { name: 'Profile', path: '/admin/profile', icon: User },
   ];
 
   return (
@@ -40,7 +47,7 @@ const AdminLayout = () => {
       {/* Sidebar Navigation */}
       <aside className={`
         ${isMobileMenuOpen ? 'flex' : 'hidden'} 
-        md:flex flex-col w-full md:w-64 bg-earth-900 text-earth-50 fixed md:sticky top-0 h-screen z-10 transition-transform duration-300
+        md:flex flex-col w-full md:w-64 bg-earth-900 text-earth-50 fixed md:sticky top-0 h-screen z-10 transition-transform duration-300 overflow-y-auto
       `}>
         <div className="p-6 hidden md:block border-b border-earth-800">
           <Link to="/admin" className="flex items-center gap-2 group">
@@ -57,7 +64,8 @@ const AdminLayout = () => {
         <nav className="flex-1 px-4 py-8 space-y-2 mt-16 md:mt-0">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.path;
+            // Exact match for overview, startsWith for others
+            const isActive = item.path === '/admin' ? location.pathname === '/admin' : location.pathname.startsWith(item.path);
             
             return (
               <Link
@@ -94,7 +102,7 @@ const AdminLayout = () => {
         <header className="bg-white border-b border-earth-200 px-8 py-4 flex justify-between items-center hidden md:flex">
           <h1 className="text-2xl font-serif font-bold text-earth-900 flex items-center gap-2">
             <Shield className="text-terracotta-600" size={24} />
-            Admin Dashboard
+            Command Center
           </h1>
           <div className="flex items-center gap-4">
             <div className="text-right">

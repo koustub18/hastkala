@@ -18,7 +18,14 @@ const ArtisanDashboard = lazy(() => import('./pages/ArtisanDashboard'));
 
 // Admin pages
 import AdminLayout from './components/layouts/AdminLayout';
-const AdminVerify = lazy(() => import('./pages/admin/AdminVerify'));
+const AdminOverview = lazy(() => import('./pages/admin/AdminOverview'));
+const AdminApplications = lazy(() => import('./pages/admin/AdminApplications'));
+const AdminArtisans = lazy(() => import('./pages/admin/AdminArtisans'));
+const AdminProducts = lazy(() => import('./pages/admin/AdminProducts'));
+const AdminEnquiries = lazy(() => import('./pages/admin/AdminEnquiries'));
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
+const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics'));
+const AdminProfile = lazy(() => import('./pages/admin/AdminProfile'));
 
 // Customer pages
 const Home = lazy(() => import('./pages/customer/Home'));
@@ -98,7 +105,14 @@ function App() {
                 <AdminLayout />
               </ProtectedRoute>
             }>
-              <Route index element={<AdminVerify />} />
+              <Route index element={<AdminOverview />} />
+              <Route path="applications" element={<AdminApplications />} />
+              <Route path="artisans" element={<AdminArtisans />} />
+              <Route path="products" element={<AdminProducts />} />
+              <Route path="enquiries" element={<AdminEnquiries />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="analytics" element={<AdminAnalytics />} />
+              <Route path="profile" element={<AdminProfile />} />
             </Route>
 
           </Routes>
