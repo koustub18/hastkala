@@ -63,6 +63,7 @@ const Signup = () => {
         name,
         email,
         role,
+        status: role === 'customer' ? 'active' : 'pending',
         createdAt: new Date().toISOString(),
         hasOnboarded: false
       });
@@ -77,9 +78,9 @@ const Signup = () => {
       localStorage.setItem('token', dummyToken);
 
       if (role === 'artisan') {
-        navigate('/seller/onboarding');
+        navigate('/seller/onboarding', { replace: true });
       } else {
-        navigate('/');
+        navigate('/', { replace: true });
       }
     } catch (err) {
       console.error('Signup error:', err);
@@ -295,9 +296,16 @@ const Signup = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-earth-900 text-white font-bold uppercase tracking-widest py-4 rounded mt-2 hover:bg-terracotta-700 transition-colors shadow-lg shadow-earth-900/20 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full bg-earth-900 text-white font-bold uppercase tracking-widest py-4 rounded mt-4 hover:bg-terracotta-700 transition-colors shadow-lg shadow-earth-900/20 flex items-center justify-center gap-3 disabled:opacity-75 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Creating Account...' : 'Create Account'}
+              {isLoading ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Creating Account…
+                </>
+              ) : (
+                'Create Account'
+              )}
             </button>
           </form>
 

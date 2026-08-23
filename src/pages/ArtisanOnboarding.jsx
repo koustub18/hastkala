@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, Upload, CreditCard, CheckCircle2, QrCode } from 'lucide-react';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../utils/firebase';
 
 const craftTypes = [
   'Textiles & Weaving', 'Pottery & Ceramics', 'Wood Carving',
@@ -53,7 +55,14 @@ const ArtisanOnboarding = () => {
           location: formData.location,
           specialty: formData.specialty,
           upi: formData.upi,
-          hasOnboarded: true
+          hasOnboarded: true,
+          status: 'pending',
+          verification: {
+            submittedAt: serverTimestamp(),
+            reviewedAt: null,
+            reviewedBy: null,
+            rejectionReason: null
+          }
         }, { merge: true });
       }
       localStorage.setItem('hasOnboarded', 'true');
@@ -61,7 +70,7 @@ const ArtisanOnboarding = () => {
       console.error('Failed to save profile', err);
     } finally {
       setIsSaving(false);
-      navigate('/seller/dashboard');
+      navigate('/seller/dashboard', { replace: true });
     }
   };
 

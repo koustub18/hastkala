@@ -56,7 +56,7 @@ const Login = () => {
         // --- HACKATHON FIX: Set token for ProtectedRoute ---
         const payload = {
           role: userData.role || 'artisan',
-          status: 'active',
+          status: userData.status || (userData.role === 'customer' ? 'active' : 'pending'),
           name: userData.name || 'Artisan'
         };
         const dummyToken = 'header.' + btoa(JSON.stringify(payload)) + '.signature';
@@ -65,11 +65,17 @@ const Login = () => {
         toast.success(`Welcome back, ${userData.name?.split(' ')[0] || 'there'}! 👋`);
 
         if (userData.role === 'customer') {
-          navigate('/');
+          navigate('/', { replace: true });
         } else if (userData.role === 'artisan') {
-          navigate(userData.hasOnboarded ? '/seller/dashboard' : '/seller/onboarding');
+          if (!userData.hasOnboarded) {
+            navigate('/seller/onboarding', { replace: true });
+          } else if (userData.status === 'pending' || userData.status === 'rejected') {
+            navigate('/pending', { replace: true });
+          } else {
+            navigate('/seller/dashboard', { replace: true });
+          }
         } else {
-          navigate('/'); // Fallback
+          navigate('/', { replace: true }); // Fallback
         }
       } else {
          // --- HACKATHON FIX: Set token for ProtectedRoute ---
@@ -77,7 +83,7 @@ const Login = () => {
          localStorage.setItem('token', 'header.' + btoa(JSON.stringify(payload)) + '.signature');
          
          toast.success(`Welcome back! 👋`);
-         navigate('/');
+         navigate('/', { replace: true });
       }
     } catch (err) {
       console.error(err);

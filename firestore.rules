@@ -1,0 +1,73 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: Check if the caller is an admin
+    function isAdmin() {
+      return request.auth != null &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Helper: Check if the caller owns this document
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // ── USERS COLLECTION ──
+    match /users/{uid} {
+      // Anyone authenticated can read user profiles (needed for artisan profiles)
+      allow read: if request.auth != null;
+
+      // Users can create their own document during signup
+      allow create: if isOwner(uid) &&
+                       request.resource.data.role in ['artisan', 'customer'] &&
+                       // Prevent self-registering as admin
+                       request.resource.data.role != 'admin';
+
+      // Users can update their OWN profile, BUT:
+      // - CANNOT change role
+      // - CANNOT change status
+      // - CANNOT write verification fields
+      allow update: if isOwner(uid) &&
+                       !request.resource.data.diff(resource.data).affectedKeys()
+                         .hasAny(['role', 'status', 'verification']);
+
+      // Admins can update ANY user (for approve/reject)
+      allow update: if isAdmin();
+
+      // Nobody can delete user documents
+      allow delete: if false;
+    }
+
+    // ── PRODUCTS COLLECTION ──
+    match /products/{productId} {
+      // Anyone can read products (public marketplace)
+      allow read: if true;
+
+      // Only active artisans can create/update/delete their own products
+      allow create: if request.auth != null &&
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'artisan' &&
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active' &&
+                       request.resource.data.artisanId == request.auth.uid;
+
+      allow update, delete: if request.auth != null &&
+                               resource.data.artisanId == request.auth.uid;
+    }
+
+    // ── ENQUIRIES COLLECTION ──
+    match /enquiries/{enquiryId} {
+      // Artisans can read their own enquiries
+      allow read: if request.auth != null &&
+                     resource.data.artisanId == request.auth.uid;
+
+      // Admins can read all enquiries
+      allow read: if isAdmin();
+
+      // Anyone authenticated can create an enquiry
+      allow create: if request.auth != null;
+
+      // No updates or deletes
+      allow update, delete: if false;
+    }
+  }
+}
