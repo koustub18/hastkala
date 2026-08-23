@@ -1,11 +1,11 @@
 import { useState } from 'react';
 // eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Eye, EyeOff, AlertCircle, Loader2, Mail, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../utils/firebase';
 
@@ -37,6 +37,8 @@ const Login = () => {
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isAdminFlow = searchParams.get('role') === 'admin';
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -53,6 +55,13 @@ const Login = () => {
       if (userDoc.exists()) {
         const userData = userDoc.data();
         
+        if (isAdminFlow && userData.role !== 'admin') {
+          await signOut(auth);
+          setError('Admin access required.');
+          setIsLoading(false);
+          return;
+        }
+
         toast.success(`Welcome back, ${userData.name?.split(' ')[0] || 'there'}! 👋`);
 
         if (userData.role === 'customer') {
@@ -71,6 +80,12 @@ const Login = () => {
           navigate('/', { replace: true }); // Fallback
         }
       } else {
+         if (isAdminFlow) {
+           await signOut(auth);
+           setError('Admin access required.');
+           setIsLoading(false);
+           return;
+         }
          toast.success(`Welcome back! 👋`);
          navigate('/', { replace: true });
       }
@@ -149,8 +164,12 @@ const Login = () => {
           </Link>
 
           <div className="mb-10 text-center mt-2 md:mt-0">
-            <h3 className="text-2xl font-serif font-bold text-earth-900 mb-2">Welcome to Hastkala</h3>
-            <p className="text-earth-500 text-sm">Please sign in to your account</p>
+            <h3 className="text-2xl font-serif font-bold text-earth-900 mb-2">
+              {isAdminFlow ? 'Admin Portal' : 'Welcome to Hastkala'}
+            </h3>
+            <p className="text-earth-500 text-sm">
+              {isAdminFlow ? 'Sign in with your administrator credentials' : 'Please sign in to your account'}
+            </p>
           </div>
 
           <form onSubmit={handleLogin} className="flex flex-col gap-5 flex-1 justify-center">
@@ -241,7 +260,7 @@ const Login = () => {
                   Signing in…
                 </>
               ) : (
-                'Sign In to Hastkala'
+                isAdminFlow ? 'Sign In as Admin' : 'Sign In to Hastkala'
               )}
             </button>
           </form>
@@ -250,6 +269,15 @@ const Login = () => {
             Don't have an account?{' '}
             <Link to="/signup" className="font-bold text-terracotta-600 hover:text-terracotta-800">Create one</Link>
           </p>
+
+          {!isAdminFlow && (
+            <div className="mt-8 pt-6 border-t border-earth-100 flex flex-col items-center justify-center">
+              <p className="text-xs text-earth-400 mb-2">Are you an administrator?</p>
+              <Link to="/login?role=admin" className="text-xs font-bold text-earth-600 hover:text-earth-900 transition-colors uppercase tracking-widest border border-earth-200 px-4 py-2 rounded">
+                Access Admin Portal
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>
