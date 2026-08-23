@@ -15,6 +15,10 @@ const PendingApproval = lazy(() => import('./pages/PendingApproval'));
 const ArtisanOnboarding = lazy(() => import('./pages/ArtisanOnboarding'));
 const ArtisanDashboard = lazy(() => import('./pages/ArtisanDashboard'));
 
+// Admin pages
+import AdminLayout from './components/layouts/AdminLayout';
+const AdminVerify = lazy(() => import('./pages/admin/AdminVerify'));
+
 // Customer pages
 const Home = lazy(() => import('./pages/customer/Home'));
 const Explore = lazy(() => import('./pages/customer/Explore'));
@@ -85,6 +89,15 @@ function App() {
             {/* Legacy fallback path handling */}
             <Route path="/onboarding" element={<Navigate to="/seller/onboarding" />} />
             <Route path="/artisan-dashboard" element={<Navigate to="/seller/dashboard" />} />
+
+            {/* Admin Portal Routes */}
+            <Route path="/admin" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<AdminVerify />} />
+            </Route>
 
           </Routes>
         </Suspense>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, ShoppingBag, Users, ShieldCheck, Heart } from 'lucide-react';
+import { ArrowRight, ShoppingBag, Users, ShieldCheck, Heart, MapPin } from 'lucide-react';
 import { useProducts } from '../../hooks/useProducts';
 
 const Home = () => {
@@ -54,6 +54,76 @@ const Home = () => {
               Explore Collection <ArrowRight size={20} />
             </Link>
           </motion.div>
+        </div>
+      </section>
+
+      {/* Featured Categories */}
+      <section className="py-20 px-4 md:px-8 bg-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-earth-900 font-serif mb-4">Discover Traditional Crafts</h2>
+            <p className="text-earth-600 text-lg max-w-2xl mx-auto">Explore India's rich heritage through various art forms, passed down through generations.</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {[
+              { name: 'Pottery', img: 'https://images.unsplash.com/photo-1610701596007-11502861dcfa?auto=format&fit=crop&q=80', delay: 0 },
+              { name: 'Textiles', img: 'https://images.unsplash.com/photo-1605000797499-95a51c5269ae?auto=format&fit=crop&q=80', delay: 0.1 },
+              { name: 'Woodwork', img: 'https://images.unsplash.com/photo-1611486212557-88be5ff6f941?auto=format&fit=crop&q=80', delay: 0.2 },
+              { name: 'Metal Art', img: 'https://images.unsplash.com/photo-1577083165261-295f70a7b458?auto=format&fit=crop&q=80', delay: 0.3 }
+            ].map((cat) => (
+              <motion.div
+                key={cat.name}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: cat.delay }}
+                className="relative h-64 rounded-2xl overflow-hidden group cursor-pointer shadow-sm hover:shadow-xl transition-all"
+              >
+                <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors z-10"></div>
+                <img src={cat.img} alt={cat.name} className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                <div className="absolute inset-0 z-20 flex items-center justify-center">
+                  <h3 className="text-white font-bold text-xl md:text-2xl font-serif tracking-wider drop-shadow-md">{cat.name}</h3>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How it Works */}
+      <section className="py-24 px-4 md:px-8 bg-earth-100">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-earth-900 font-serif mb-4">How Hastkala Works</h2>
+            <p className="text-earth-600 text-lg max-w-2xl mx-auto">A transparent, direct connection between you and the makers.</p>
+          </div>
+          
+          <div className="grid md:grid-cols-4 gap-8 relative">
+            {/* Connection Line */}
+            <div className="hidden md:block absolute top-12 left-24 right-24 h-0.5 bg-earth-300"></div>
+            
+            {[
+              { step: '1', title: 'Discover', desc: 'Browse authentic crafts from verified artisans across India.' },
+              { step: '2', title: 'Connect', desc: 'Send direct purchase enquiries to the artisan for your chosen product.' },
+              { step: '3', title: 'Negotiate', desc: 'Discuss details, customization, and fair pricing directly.' },
+              { step: '4', title: 'Empower', desc: 'Complete your purchase knowing 100% goes to the creator.' }
+            ].map((item, i) => (
+              <motion.div 
+                key={item.step}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: i * 0.15 }}
+                className="relative z-10 flex flex-col items-center text-center"
+              >
+                <div className="w-24 h-24 rounded-full bg-white border-4 border-earth-200 shadow-md flex items-center justify-center text-3xl font-bold text-terracotta-600 font-serif mb-6">
+                  {item.step}
+                </div>
+                <h3 className="text-xl font-bold text-earth-900 mb-3">{item.title}</h3>
+                <p className="text-earth-600 leading-relaxed">{item.desc}</p>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -119,6 +189,69 @@ const Home = () => {
             ))}
           </div>
         )}
+      </section>
+
+      {/* Featured Artisans */}
+      <section className="py-24 px-4 md:px-8 bg-earth-50 border-t border-earth-100">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-earth-900 font-serif mb-4">Meet Our Master Artisans</h2>
+            <p className="text-earth-600 text-lg max-w-2xl mx-auto">The skilled hands and creative minds preserving India's cultural heritage.</p>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                id: 'artisan-1',
+                name: 'Kavita Devi',
+                craft: 'Terracotta Pottery',
+                location: 'Rajasthan',
+                image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80',
+                story: 'A third-generation potter, Kavita brings traditional Rajasthani designs to life with her unique, hand-painted terracotta pieces.'
+              },
+              {
+                id: 'artisan-2',
+                name: 'Ramesh Weaver',
+                craft: 'Handloom Textiles',
+                location: 'Varanasi',
+                image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80',
+                story: 'Specializing in Banarasi silk, Ramesh weaves intricate patterns that have been in his family for over 150 years.'
+              },
+              {
+                id: 'artisan-3',
+                name: 'Anjali Sharma',
+                craft: 'Dhokra Metal Craft',
+                location: 'Chhattisgarh',
+                image: 'https://images.unsplash.com/photo-1531123897727-8f129e1bf98c?auto=format&fit=crop&q=80',
+                story: 'Anjali uses the ancient lost-wax casting technique to create stunning brass figurines depicting tribal life and nature.'
+              }
+            ].map((artisan, index) => (
+              <motion.div
+                key={artisan.id}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: index * 0.2 }}
+                className="bg-white rounded-[2rem] p-6 shadow-sm hover:shadow-xl transition-all duration-300 border border-earth-100 group"
+              >
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-earth-100">
+                    <img src={artisan.image} alt={artisan.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-xl text-earth-900 font-serif">{artisan.name}</h3>
+                    <p className="text-terracotta-600 font-medium text-sm">{artisan.craft}</p>
+                    <p className="text-earth-500 text-sm flex items-center gap-1 mt-1"><MapPin size={14} /> {artisan.location}</p>
+                  </div>
+                </div>
+                <p className="text-earth-600 text-sm leading-relaxed mb-6 italic">"{artisan.story}"</p>
+                <Link to="/explore" className="block text-center w-full py-2.5 rounded-full border border-earth-200 text-earth-700 font-medium hover:bg-earth-50 hover:text-earth-900 transition-colors">
+                  View Collection
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        </div>
       </section>
 
       {/* Impact Section */}

@@ -15,8 +15,12 @@ service cloud.firestore {
 
     // ── USERS COLLECTION ──
     match /users/{uid} {
-      // Anyone authenticated can read user profiles (needed for artisan profiles)
-      allow read: if request.auth != null;
+      // Owner can read their own profile
+      // Admins can read all profiles
+      // Public can only read active artisan profiles
+      allow read: if isOwner(uid) || 
+                     isAdmin() || 
+                     (resource.data.role == 'artisan' && resource.data.status == 'active');
 
       // Users can create their own document during signup
       allow create: if isOwner(uid) &&

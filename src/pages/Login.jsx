@@ -74,6 +74,8 @@ const Login = () => {
           } else {
             navigate('/seller/dashboard', { replace: true });
           }
+        } else if (userData.role === 'admin') {
+          navigate('/admin', { replace: true });
         } else {
           navigate('/', { replace: true }); // Fallback
         }
