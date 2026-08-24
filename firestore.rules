@@ -5,7 +5,9 @@ service cloud.firestore {
     // Helper: Check if the caller is an admin
     function isAdmin() {
       return request.auth != null &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+             ((('admin' in request.auth.token) && request.auth.token.admin == true) ||
+              (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
     }
 
     // Helper: Check if the caller owns this document
@@ -20,7 +22,7 @@ service cloud.firestore {
       // Public can only read active artisan profiles
       allow read: if isOwner(uid) || 
                      isAdmin() || 
-                     (resource.data.role == 'artisan' && resource.data.status == 'active');
+                     (resource != null && resource.data.role == 'artisan' && resource.data.status == 'active');
 
       // Users can create their own document during signup
       allow create: if isOwner(uid) &&

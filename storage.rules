@@ -1,0 +1,33 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper: Check if the caller is an admin (using cross-service rules)
+    function isAdmin() {
+      return request.auth != null && 
+        ((('admin' in request.auth.token) && request.auth.token.admin == true) ||
+         (firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
+          firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    match /products/{userId}/{fileName} {
+      // READ: Anyone can read product images (marketplace requirement)
+      allow read: if true;
+      
+      // WRITE: Only the artisan who owns the path, OR admin
+      allow create, update: if request.auth != null && 
+        (request.auth.uid == userId || isAdmin()) &&
+        request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/(jpeg|png|webp)');
+
+      // DELETE: Only the artisan who owns the path, OR admin
+      allow delete: if request.auth != null && 
+        (request.auth.uid == userId || isAdmin());
+    }
+
+    // Default deny for all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
