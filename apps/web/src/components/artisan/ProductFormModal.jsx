@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { IndianRupee, Sparkles, CheckCircle2, ChevronRight, X, Loader2, Upload, ImageIcon, Mic, Wand2, Calculator, Info } from 'lucide-react';
 import { getPriceSuggestion } from '@hastkala/core';
@@ -17,22 +17,99 @@ const ProductFormModal = ({
   isSubmitting
 }) => {
   const [isListening, setIsListening] = useState(false);
+  const [isProcessingAudio, setIsProcessingAudio] = useState(false);
+  const [audioError, setAudioError] = useState('');
+  const mediaRecorderRef = useRef(null);
+  const chunksRef = useRef([]);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [enhancedImage, setEnhancedImage] = useState(null);
   const [isPricing, setIsPricing] = useState(false);
   const [pricingError, setPricingError] = useState('');
 
-  const handleVoiceCataloging = () => {
-    setIsListening(true);
-    setTimeout(() => {
+  const startRecording = async () => {
+    setAudioError('');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        chunksRef.current = [];
+        // stop all tracks
+        stream.getTracks().forEach(track => track.stop());
+        
+        await processAudio(audioBlob);
+      };
+
+      mediaRecorder.start();
+      setIsListening(true);
+    } catch (err) {
+      console.error('Error accessing microphone:', err);
+      setAudioError('Microphone access denied or unavailable.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
       setIsListening(false);
+    }
+  };
+
+  const processAudio = async (audioBlob) => {
+    setIsProcessingAudio(true);
+    setAudioError('');
+    try {
+      const formData = new FormData();
+      formData.append('audio_file', audioBlob, 'recording.webm');
+
+      const response = await fetch('/api/ai/catalog', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('AI Catalog API returned status ' + response.status);
+      }
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to generate catalog');
+      }
+
+      const { catalog } = data;
       setNewProduct(p => ({
         ...p,
-        title: 'Hand-Carved Wooden Elephant',
-        category: 'Toys',
-        material: 'Teak Wood'
+        title: catalog.title || p.title,
+        category: catalog.category || p.category,
+        material: catalog.material || p.material,
+        description: catalog.descriptionEnglish || p.description,
+        descriptionHindi: catalog.descriptionHindi || p.descriptionHindi,
+        seoKeywords: catalog.seoKeywords || p.seoKeywords,
+        color: catalog.color || p.color,
+        craftType: catalog.craftType || p.craftType,
+        tags: catalog.tags || p.tags,
       }));
-    }, 3000);
+    } catch (err) {
+      console.error('Error processing audio:', err);
+      setAudioError('Failed to generate catalog from audio. Please try again or type manually.');
+    } finally {
+      setIsProcessingAudio(false);
+    }
+  };
+
+  const handleVoiceCataloging = () => {
+    if (isListening) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
   };
 
   const handleEnhanceImage = () => {
@@ -106,27 +183,41 @@ const ProductFormModal = ({
           ) : (
             <form onSubmit={handleAddProduct} className="p-6 space-y-5">
               {/* Multilingual Voice Cataloging Feature */}
-              <div className="bg-terracotta-50/50 border border-terracotta-200 rounded-xl p-4 flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-bold text-earth-900 flex items-center gap-1">
-                    <Mic size={16} className="text-terracotta-500" /> Multilingual Voice Cataloging
-                  </h4>
-                  <p className="text-xs text-earth-500 mt-1">Speak in your native language to auto-fill details.</p>
+              <div className="bg-terracotta-50/50 border border-terracotta-200 rounded-xl p-4 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-earth-900 flex items-center gap-1">
+                      <Mic size={16} className="text-terracotta-500" /> Multilingual Voice Cataloging
+                    </h4>
+                    <p className="text-xs text-earth-500 mt-1">Speak in your native language to auto-fill details.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleVoiceCataloging}
+                    disabled={isProcessingAudio}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 ${
+                      isListening ? 'bg-red-500 text-white animate-pulse hover:bg-red-600 shadow-sm' : 
+                      isProcessingAudio ? 'bg-terracotta-200 text-terracotta-700 cursor-not-allowed' : 'bg-terracotta-600 text-white hover:bg-terracotta-500 shadow-sm'
+                    }`}
+                  >
+                    {isProcessingAudio ? (
+                      <><Loader2 size={14} className="animate-spin" /> Processing AI...</>
+                    ) : isListening ? (
+                      <><Mic size={14} /> Stop Recording</>
+                    ) : (
+                      <><Mic size={14} /> Start Speaking</>
+                    )}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleVoiceCataloging}
-                  disabled={isListening}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 ${
-                    isListening ? 'bg-terracotta-200 text-terracotta-700 animate-pulse' : 'bg-terracotta-600 text-white hover:bg-terracotta-500 shadow-sm'
-                  }`}
-                >
-                  {isListening ? (
-                    <><Loader2 size={14} className="animate-spin" /> Listening...</>
-                  ) : (
-                    <><Mic size={14} /> Start Speaking</>
-                  )}
-                </button>
+                {audioError && (
+                  <p className="text-xs text-red-500 font-medium">{audioError}</p>
+                )}
+                {newProduct.descriptionHindi && (
+                  <div className="bg-white p-3 rounded-lg border border-terracotta-100 mt-2 text-xs">
+                    <span className="font-bold text-earth-700 block mb-1">Generated Hindi Description (Saved as metadata):</span>
+                    <span className="text-earth-600">{newProduct.descriptionHindi}</span>
+                  </div>
+                )}
               </div>
 
               <div>
