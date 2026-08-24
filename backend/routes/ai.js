@@ -218,4 +218,129 @@ router.post('/enhance', imageLimiter, (req, res) => {
   });
 });
 
+// Configure multer for audio upload
+const uploadAudio = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedMime = [
+      'audio/mp4', 'audio/aac', 'audio/x-m4a', 'audio/m4a',
+      'audio/webm', 'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg',
+      'video/mp4', 'video/webm' // Sometimes mobile recorders use these
+    ];
+    if (allowedMime.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Unsupported MIME type'), false);
+    }
+  }
+}).single('audio_file');
+
+// ── Catalog-specific rate limit: 5 requests per minute per IP ──
+const catalogLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many catalog generation requests. Please wait a moment before trying again.' }
+});
+
+// ── AI Multilingual Auto-Cataloger ──
+router.post('/catalog', catalogLimiter, (req, res) => {
+  uploadAudio(req, res, async (err) => {
+    if (err) {
+      if (err.message === 'Unsupported MIME type') {
+        return res.status(400).json({ success: false, error: 'Unsupported audio type.' });
+      }
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ success: false, error: 'Audio too large. Maximum 5MB.' });
+      }
+      return res.status(400).json({ success: false, error: err.message });
+    }
+
+    try {
+      if (!req.file) {
+        return res.status(400).json({ success: false, error: 'Audio file is required.' });
+      }
+
+      const prompt = `You are an expert cataloger for an artisan e-commerce marketplace (Hastkala). 
+Listen to the audio description of the artisan product (it may be in Hindi, Odia, Bengali, Telugu, Tamil, Kannada, Marathi, Gujarati, Punjabi, English, or mixed/code-switched). 
+Extract the details to build a professional product catalog. Do NOT invent or hallucinate information that is not present in the audio (return empty strings or null for missing optional fields).
+
+Create a structured JSON response matching the following schema EXACTLY:
+{
+  "title": "SEO-friendly product title in English",
+  "descriptionEnglish": "Professional, marketplace-ready description in English",
+  "descriptionHindi": "Natural, marketplace-ready description translated to Hindi",
+  "seoKeywords": ["keyword1", "keyword2"],
+  "category": "Main category string (e.g., Clothing, Home Decor, Art) or empty string",
+  "material": "Material used (e.g., Cotton, Wood) or empty string",
+  "color": "Primary color or empty string",
+  "craftType": "Specific craft type (e.g., Ikat, Pattachitra) or empty string",
+  "tags": ["tag1", "tag2"]
+}
+
+Keep descriptions concise and professional. SEO keywords and tags should be derived from the product and relevant to search, without keyword stuffing (max 10).`;
+
+      const contents = [
+        { text: prompt },
+        { inlineData: { data: req.file.buffer.toString("base64"), mimeType: req.file.mimetype } }
+      ];
+
+      // ── Gemini call with timeout ──
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60000); // 60 second timeout for audio processing
+
+      let response;
+      try {
+        response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: contents,
+          config: {
+            responseMimeType: 'application/json',
+          }
+        });
+      } catch (e) {
+        clearTimeout(timeout);
+        console.error("Gemini API Error:", e);
+        return res.status(502).json({ success: false, error: 'AI provider request failed or timed out.' });
+      }
+      clearTimeout(timeout);
+
+      let rawText = response.text || '';
+      rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+      
+      let result;
+      try {
+        result = JSON.parse(rawText);
+      } catch (e) {
+        console.error("Failed to parse Gemini output:", rawText);
+        return res.status(500).json({ success: false, error: "Failed to generate valid catalog structure." });
+      }
+
+      // ── Validation ──
+      const validated = {
+        title: typeof result.title === 'string' ? result.title : '',
+        descriptionEnglish: typeof result.descriptionEnglish === 'string' ? result.descriptionEnglish : '',
+        descriptionHindi: typeof result.descriptionHindi === 'string' ? result.descriptionHindi : '',
+        seoKeywords: Array.isArray(result.seoKeywords) ? result.seoKeywords.slice(0, 10).map(String) : [],
+        category: typeof result.category === 'string' ? result.category : undefined,
+        material: typeof result.material === 'string' ? result.material : undefined,
+        color: typeof result.color === 'string' ? result.color : undefined,
+        craftType: typeof result.craftType === 'string' ? result.craftType : undefined,
+        tags: Array.isArray(result.tags) ? result.tags.slice(0, 10).map(String) : [],
+      };
+
+      res.status(200).json({
+        success: true,
+        catalog: validated
+      });
+
+    } catch (error) {
+      console.error('Catalog AI Error:', error);
+      res.status(500).json({ success: false, error: 'Internal Server Error' });
+    }
+  });
+});
+
 module.exports = router;
