@@ -4,6 +4,8 @@ import { useRouter } from 'expo-router';
 import { createProduct, uploadProductImage, ProcessedImage } from '@hastkala/core';
 import { useAuth } from '../../../components/AuthProvider';
 import { ImageStudio } from '../../../components/artisan/ImageStudio';
+import { Audio } from 'expo-av';
+import { Mic, Square } from 'lucide-react-native';
 
 export default function AddProductScreen() {
   const router = useRouter();
@@ -15,6 +17,100 @@ export default function AddProductScreen() {
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [productImage, setProductImage] = useState<ProcessedImage | null>(null);
+  
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [isProcessingVoice, setIsProcessingVoice] = useState(false);
+  const [voiceError, setVoiceError] = useState('');
+  const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:5001';
+
+  const startRecording = async () => {
+    try {
+      setVoiceError('');
+      const permission = await Audio.requestPermissionsAsync();
+      if (permission.status === 'granted') {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+        });
+        const { recording: newRecording } = await Audio.Recording.createAsync(
+          Audio.RecordingOptionsPresets.HIGH_QUALITY
+        );
+        setRecording(newRecording);
+        
+        // 60-second limit
+        setTimeout(() => {
+          stopRecording(newRecording);
+        }, 60000);
+      } else {
+        setVoiceError('Microphone permission not granted');
+      }
+    } catch (err) {
+      console.error('Failed to start recording', err);
+      setVoiceError('Failed to start recording');
+    }
+  };
+
+  const stopRecording = async (rec: Audio.Recording | null = recording) => {
+    if (!rec) return;
+    setRecording(null);
+    setIsProcessingVoice(true);
+    setVoiceError('');
+
+    try {
+      await rec.stopAndUnloadAsync();
+      const uri = rec.getURI();
+      if (!uri) throw new Error('No recording URI found');
+
+      const formData = new FormData();
+      formData.append('audio_file', {
+        uri,
+        name: 'catalog_voice.m4a',
+        type: 'audio/m4a',
+      } as any);
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60000);
+
+      const response = await fetch(`${API_URL}/api/ai/catalog`, {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+      clearTimeout(timeout);
+
+      const data = await response.json();
+      
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to generate catalog');
+      }
+
+      const generated = data.catalog;
+      if (generated) {
+        if (generated.title && !title) setTitle(generated.title);
+        if (generated.category && !category) setCategory(generated.category);
+        
+        let desc = description;
+        if (generated.descriptionEnglish) desc = generated.descriptionEnglish;
+        if (generated.descriptionHindi) desc += `\n\nGenerated Hindi Description:\n${generated.descriptionHindi}`;
+        if (generated.material) desc += `\n\nMaterial: ${generated.material}`;
+        if (generated.color) desc += `\nColor: ${generated.color}`;
+        if (generated.craftType) desc += `\nCraft: ${generated.craftType}`;
+        
+        setDescription(desc);
+      }
+    } catch (err: any) {
+      console.error('Processing error', err);
+      setVoiceError(err.message || 'Error processing audio');
+    } finally {
+      setIsProcessingVoice(false);
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+      });
+    }
+  };
 
   const handleSubmit = async () => {
     if (!title || !category || !price) {
@@ -60,6 +156,48 @@ export default function AddProductScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.headerTitle}>Add New Product</Text>
       <Text style={styles.subtitle}>List a new handicraft in the marketplace.</Text>
+
+      <View style={styles.voiceCard}>
+        <View style={styles.voiceHeader}>
+          <Mic color="#8B4513" size={20} />
+          <Text style={styles.voiceTitle}>Multilingual Voice Cataloging</Text>
+        </View>
+        <Text style={styles.voiceSubtitle}>Speak in your native language to auto-fill details.</Text>
+        
+        {voiceError ? <Text style={styles.errorText}>{voiceError}</Text> : null}
+
+        <TouchableOpacity 
+          style={[
+            styles.voiceButton, 
+            recording ? styles.recordingButton : 
+            isProcessingVoice ? styles.processingButton : 
+            styles.idleButton
+          ]}
+          onPress={() => {
+            if (isProcessingVoice) return;
+            if (recording) stopRecording();
+            else startRecording();
+          }}
+          disabled={isProcessingVoice}
+        >
+          {isProcessingVoice ? (
+            <View style={styles.voiceButtonContent}>
+              <ActivityIndicator color="#8B4513" size="small" />
+              <Text style={[styles.voiceButtonText, { color: '#8B4513' }]}>Processing AI...</Text>
+            </View>
+          ) : recording ? (
+            <View style={styles.voiceButtonContent}>
+              <Square color="white" size={16} fill="white" />
+              <Text style={[styles.voiceButtonText, { color: 'white' }]}>Stop Recording</Text>
+            </View>
+          ) : (
+            <View style={styles.voiceButtonContent}>
+              <Mic color="white" size={16} />
+              <Text style={[styles.voiceButtonText, { color: 'white' }]}>Start Speaking</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
 
       <Text style={styles.label}>Product Title *</Text>
       <TextInput
@@ -145,6 +283,62 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 60,
     paddingBottom: 40,
+  },
+  voiceCard: {
+    backgroundColor: '#FFF3E0',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#FFE0B2',
+  },
+  voiceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  voiceTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#8B4513',
+  },
+  voiceSubtitle: {
+    fontSize: 13,
+    color: '#D84315',
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#D32F2F',
+    fontSize: 12,
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  voiceButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  idleButton: {
+    backgroundColor: '#D84315',
+  },
+  recordingButton: {
+    backgroundColor: '#D32F2F',
+  },
+  processingButton: {
+    backgroundColor: '#FFE0B2',
+  },
+  voiceButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  voiceButtonText: {
+    fontWeight: 'bold',
+    fontSize: 14,
+    textTransform: 'uppercase',
   },
   headerTitle: {
     fontSize: 28,
