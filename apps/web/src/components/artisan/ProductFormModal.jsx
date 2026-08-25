@@ -358,6 +358,7 @@ const ProductFormModal = ({
                         <IndianRupee size={16} className="text-earth-500" />
                       </div>
                       <input
+                        id="selling-price-input"
                         required
                         type="number"
                         value={newProduct.price}
