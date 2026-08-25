@@ -10,31 +10,46 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [authState, setAuthState] = useState('initializing'); // initializing, unauthenticated, profile_loading, ready
+
+  const fetchProfile = async (uid) => {
+    try {
+      const userData = await getUserProfile(uid);
+      setProfile(userData || null);
+      return userData;
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+      setProfile(null);
+      return null;
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
       if (currentUser) {
-        try {
-          const userData = await getUserProfile(currentUser.uid);
-          if (userData) {
-            setProfile(userData);
-          } else {
-            setProfile(null);
-          }
-        } catch (error) {
-          console.error("Error fetching user profile:", error);
-          setProfile(null);
-        }
+        setUser(currentUser);
+        setAuthState('profile_loading');
+        await fetchProfile(currentUser.uid);
+        setAuthState('ready');
       } else {
+        setUser(null);
         setProfile(null);
+        setAuthState('unauthenticated');
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
+
+  const reloadProfile = async () => {
+    if (auth.currentUser) {
+      setAuthState('profile_loading');
+      const userData = await fetchProfile(auth.currentUser.uid);
+      setAuthState('ready');
+      return userData;
+    }
+    return null;
+  };
 
   const logout = () => logoutUser();
 
@@ -44,13 +59,15 @@ export const AuthProvider = ({ children }) => {
     userRole: profile?.role || null,
     userStatus: profile?.status || null,
     userName: profile?.name || null,
-    loading,
+    loading: authState === 'initializing' || authState === 'profile_loading',
+    authState,
+    reloadProfile,
     logout
   };
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {authState !== 'initializing' && children}
     </AuthContext.Provider>
   );
 };

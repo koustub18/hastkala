@@ -3,6 +3,7 @@ import { View, Text, ScrollView, StyleSheet, ActivityIndicator } from 'react-nat
 import { useAuth } from '../../components/AuthProvider';
 import { getProducts, getEnquiriesByArtisan, Product, Enquiry } from '@hastkala/core';
 import { Ionicons } from '@expo/vector-icons';
+import { NotificationCenter } from '../../components/artisan/NotificationCenter';
 
 export default function ArtisanDashboard() {
   const { profile } = useAuth();
@@ -44,8 +45,11 @@ export default function ArtisanDashboard() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.greeting}>Welcome, {profile?.businessName || profile?.name || 'Artisan'}</Text>
-        <Text style={styles.date}>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</Text>
+        <View style={styles.headerTitle}>
+          <Text style={styles.greeting}>Welcome, {profile?.businessName || profile?.name || 'Artisan'}</Text>
+          <Text style={styles.date}>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</Text>
+        </View>
+        <NotificationCenter />
       </View>
 
       {isPending && (
@@ -100,7 +104,13 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 24,
+  },
+  headerTitle: {
+    flex: 1,
   },
   greeting: {
     fontSize: 28,

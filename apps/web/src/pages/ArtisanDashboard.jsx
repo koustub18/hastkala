@@ -14,6 +14,7 @@ import { useEffect } from 'react';
 const ArtisanDashboard = () => {
   const dashboardState = useArtisanDashboard();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = React.useState('products');
 
   useEffect(() => {
     if (dashboardState.authStatus === 'unauthenticated') {
@@ -43,8 +44,6 @@ const ArtisanDashboard = () => {
     );
   }
 
-  const [activeTab, setActiveTab] = React.useState('products');
-
   return (
     <div className="min-h-screen bg-earth-50 pb-20">
       <Navbar />
@@ -73,7 +72,7 @@ const ArtisanDashboard = () => {
                 <div className="flex flex-col md:flex-row md:items-center gap-3 justify-center md:justify-start mb-2">
                    <h1 className="text-3xl font-serif font-bold tracking-tight">{dashboardState.artisan.name || 'My Artisan Profile'}</h1>
                    <span className="bg-forest-500/20 text-forest-300 border border-forest-500/30 text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full flex items-center gap-1.5 self-center md:self-auto w-max">
-                     <ShieldAlert size={12} /> {dashboardState.artisan.isVerified ? 'Verified Artisan' : 'Verification Pending'}
+                     <ShieldAlert size={12} /> {dashboardState.artisan.status === 'active' ? 'Verified Artisan' : 'Verification Pending'}
                    </span>
                 </div>
                 <p className="text-earth-400 font-medium">

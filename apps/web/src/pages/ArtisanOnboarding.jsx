@@ -52,17 +52,11 @@ const ArtisanOnboarding = () => {
       const user = auth.currentUser;
       if (user) {
         await setDoc(doc(db, 'users', user.uid), {
+          phone: formData.phone,
           location: formData.location,
           specialty: formData.specialty,
-          upi: formData.upi,
-          hasOnboarded: true,
-          status: 'pending',
-          verification: {
-            submittedAt: serverTimestamp(),
-            reviewedAt: null,
-            reviewedBy: null,
-            rejectionReason: null
-          }
+          upiId: formData.upi,
+          hasOnboarded: true
         }, { merge: true });
       }
     } catch (err) {

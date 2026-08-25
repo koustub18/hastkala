@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { IndianRupee, Sparkles, CheckCircle2, ChevronRight, X, Loader2, Upload, ImageIcon, Mic, Wand2, Calculator, Info } from 'lucide-react';
-import { getPriceSuggestion } from '@hastkala/core';
+import { getPriceSuggestion, createNotification } from '@hastkala/core';
+import { useAuth } from '../../contexts/AuthContext';
 
 const ProductFormModal = ({
   showModal,
@@ -16,6 +17,7 @@ const ProductFormModal = ({
   uploadImage,
   isSubmitting
 }) => {
+  const { user } = useAuth();
   const [isListening, setIsListening] = useState(false);
   const [isProcessingAudio, setIsProcessingAudio] = useState(false);
   const [audioError, setAudioError] = useState('');
@@ -96,9 +98,26 @@ const ProductFormModal = ({
         craftType: catalog.craftType || p.craftType,
         tags: catalog.tags || p.tags,
       }));
+      
+      if (user?.uid) {
+        createNotification({
+          userId: user.uid,
+          type: 'catalog_success',
+          title: 'Catalog Generated',
+          message: 'Your product details were successfully generated using voice AI.'
+        });
+      }
     } catch (err) {
       console.error('Error processing audio:', err);
       setAudioError('Failed to generate catalog from audio. Please try again or type manually.');
+      if (user?.uid) {
+        createNotification({
+          userId: user.uid,
+          type: 'catalog_failed',
+          title: 'Catalog Generation Failed',
+          message: 'Something went wrong while creating your catalog. You can continue editing manually.'
+        });
+      }
     } finally {
       setIsProcessingAudio(false);
     }
@@ -118,6 +137,14 @@ const ProductFormModal = ({
     setTimeout(() => {
       setIsEnhancing(false);
       setEnhancedImage(newProduct.image);
+      if (user?.uid) {
+        createNotification({
+          userId: user.uid,
+          type: 'image_enhanced_success',
+          title: 'Image Enhanced',
+          message: 'Your product image was successfully enhanced with AI.'
+        });
+      }
     }, 2000);
   };
 
@@ -136,9 +163,26 @@ const ProductFormModal = ({
         aiPricingFactors: result.factors || [],
         pricingUpdatedAt: new Date().toISOString()
       }));
+      
+      if (user?.uid) {
+        createNotification({
+          userId: user.uid,
+          type: 'pricing_success',
+          title: 'Price Suggestion Ready',
+          message: 'AI has analyzed market trends and suggested a price for your product.'
+        });
+      }
     } catch (err) {
       console.error(err);
       setPricingError('Failed to get pricing suggestion. Please enter manually.');
+      if (user?.uid) {
+        createNotification({
+          userId: user.uid,
+          type: 'pricing_failed',
+          title: 'Price Suggestion Failed',
+          message: 'Failed to generate price suggestion. You can enter the price manually.'
+        });
+      }
     } finally {
       setIsPricing(false);
     }

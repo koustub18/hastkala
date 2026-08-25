@@ -140,10 +140,10 @@ const AdminApplications = () => {
                     {artisan.name?.charAt(0) || 'A'}
                   </div>
                   <div>
-                    <h3 className="font-bold text-earth-900">{artisan.name}</h3>
+                    <h3 className="font-bold text-earth-900">{artisan.name || 'Not provided'}</h3>
                     <div className="flex items-center gap-3 text-sm text-earth-500 mt-1">
-                      <span className="flex items-center gap-1"><Store size={14} /> {artisan.specialty || 'General'}</span>
-                      <span className="flex items-center gap-1"><MapPin size={14} /> {artisan.location?.city || 'Unknown Location'}</span>
+                      <span className="flex items-center gap-1"><Store size={14} /> {artisan.specialty || 'Not provided'}</span>
+                      <span className="flex items-center gap-1"><MapPin size={14} /> {artisan.location || 'Not provided'}</span>
                     </div>
                   </div>
                 </div>
@@ -163,11 +163,11 @@ const AdminApplications = () => {
                       <div>
                         <h4 className="text-xs font-bold text-earth-400 uppercase tracking-wider mb-3">Artisan Details</h4>
                         <div className="bg-white p-4 rounded border border-earth-200 space-y-3">
-                          <div><span className="text-xs text-earth-500 block mb-1">Full Name</span><span className="font-medium text-earth-900">{artisan.name}</span></div>
-                          <div><span className="text-xs text-earth-500 block mb-1">Email Address</span><span className="font-medium text-earth-900">{artisan.email}</span></div>
+                          <div><span className="text-xs text-earth-500 block mb-1">Full Name</span><span className="font-medium text-earth-900">{artisan.name || 'Not provided'}</span></div>
+                          <div><span className="text-xs text-earth-500 block mb-1">Email Address</span><span className="font-medium text-earth-900">{artisan.email || 'Not provided'}</span></div>
                           <div><span className="text-xs text-earth-500 block mb-1">Phone Number</span><span className="font-medium text-earth-900">{artisan.phone || 'Not provided'}</span></div>
-                          {artisan.verification?.submittedAt && getSafeDate(artisan.verification.submittedAt) && (
-                            <div><span className="text-xs text-earth-500 block mb-1">Applied On</span><span className="font-medium text-earth-900">{getSafeDate(artisan.verification.submittedAt).toLocaleString()}</span></div>
+                          { (artisan.verification?.submittedAt || artisan.createdAt) && getSafeDate(artisan.verification?.submittedAt || artisan.createdAt) && (
+                            <div><span className="text-xs text-earth-500 block mb-1">Applied On</span><span className="font-medium text-earth-900">{getSafeDate(artisan.verification?.submittedAt || artisan.createdAt).toLocaleString()}</span></div>
                           )}
                         </div>
                       </div>
@@ -177,8 +177,8 @@ const AdminApplications = () => {
                       <div>
                         <h4 className="text-xs font-bold text-earth-400 uppercase tracking-wider mb-3">Business Details</h4>
                         <div className="bg-white p-4 rounded border border-earth-200 space-y-3">
-                          <div><span className="text-xs text-earth-500 block mb-1">Craft Specialty</span><span className="font-medium text-earth-900">{artisan.specialty || 'Not specified'}</span></div>
-                          <div><span className="text-xs text-earth-500 block mb-1">Location</span><span className="font-medium text-earth-900">{artisan.location ? `${artisan.location.city}, ${artisan.location.state}, ${artisan.location.pincode}` : 'Not provided'}</span></div>
+                          <div><span className="text-xs text-earth-500 block mb-1">Craft Specialty</span><span className="font-medium text-earth-900">{artisan.specialty || 'Not provided'}</span></div>
+                          <div><span className="text-xs text-earth-500 block mb-1">Location</span><span className="font-medium text-earth-900">{artisan.location || 'Not provided'}</span></div>
                           <div>
                             <span className="text-xs text-earth-500 block mb-1">UPI ID (For Payments)</span>
                             <div className="flex items-center gap-2"><CreditCard size={14} className="text-earth-400" /><span className="font-medium text-earth-900">{artisan.upiId || 'Not provided'}</span></div>

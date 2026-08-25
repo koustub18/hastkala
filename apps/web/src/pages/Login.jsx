@@ -6,7 +6,9 @@ import { ArrowLeft, Eye, EyeOff, AlertCircle, Loader2, Mail, Lock } from 'lucide
 import toast from 'react-hot-toast';
 
 import { auth } from '@hastkala/core';
-import { loginUser, getUserProfile, logoutUser } from '@hastkala/core';
+import { loginUser, logoutUser } from '@hastkala/core';
+import { signOut } from 'firebase/auth';
+import { useAuth } from '../contexts/AuthContext';
 
 const GoogleIcon = () => (
   <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -36,6 +38,7 @@ const Login = () => {
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { reloadProfile } = useAuth();
   const [searchParams] = useSearchParams();
   const isAdminFlow = searchParams.get('role') === 'admin';
 
@@ -45,8 +48,8 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const user = await loginUser(email, password);
-      const userData = await getUserProfile(user.uid);
+      await loginUser(email, password);
+      const userData = await reloadProfile();
 
       if (userData) {
         

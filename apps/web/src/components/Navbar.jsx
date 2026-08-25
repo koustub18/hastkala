@@ -4,12 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, User, Heart, Search, IndianRupee } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-
+import { NotificationCenter } from './NotificationCenter';
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, userRole, logout } = useAuth();
   const isHomePage = location.pathname === '/';
 
@@ -92,14 +93,17 @@ const Navbar = () => {
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-6">
           {userRole === 'artisan' && (
-            <Link 
-              to="/seller/dashboard" 
-              className={`transition-colors block ${(isScrolled || !isHomePage) ? 'text-earth-600 hover:text-terracotta-600' : 'text-earth-100 hover:text-white'}`}
-            >
-              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                <User size={20} strokeWidth={2} />
-              </motion.div>
-            </Link>
+            <div className="flex items-center gap-4">
+              <NotificationCenter />
+              <Link 
+                to="/seller/dashboard" 
+                className={`transition-colors block ${(isScrolled || !isHomePage) ? 'text-earth-600 hover:text-terracotta-600' : 'text-earth-100 hover:text-white'}`}
+              >
+                <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                  <User size={20} strokeWidth={2} />
+                </motion.div>
+              </Link>
+            </div>
           )}
 
           {userRole ? (
@@ -129,12 +133,17 @@ const Navbar = () => {
 
 
         {/* Mobile Menu Button */}
-        <button 
-          className={`md:hidden p-2 transition-colors ${(isScrolled || !isHomePage) ? 'text-earth-800' : 'text-white'}`}
-          onClick={() => setMobileMenuOpen(true)}
-        >
-          <Menu size={24} strokeWidth={1.5} />
-        </button>
+        <div className="md:hidden flex items-center gap-4">
+          {userRole === 'artisan' && (
+            <NotificationCenter />
+          )}
+          <button 
+            className={`p-2 transition-colors ${(isScrolled || !isHomePage) ? 'text-earth-800' : 'text-white'}`}
+            onClick={() => setMobileMenuOpen(true)}
+          >
+            <Menu size={24} strokeWidth={1.5} />
+          </button>
+        </div>
       </div>
     </motion.header>
 

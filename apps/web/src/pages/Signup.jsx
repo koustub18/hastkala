@@ -6,6 +6,7 @@ import { ArrowLeft, User, Mail, Lock, Eye, EyeOff, ShoppingBag, Store, AlertCirc
 
 import { auth } from '@hastkala/core';
 import { registerUser } from '@hastkala/core';
+import { useAuth } from '../contexts/AuthContext';
 
 const Signup = () => {
   const [name, setName] = useState('');
@@ -17,6 +18,7 @@ const Signup = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedRole, setSelectedRole] = useState('customer'); // Default to customer
   const navigate = useNavigate();
+  const { reloadProfile } = useAuth();
 
   const getPasswordStrength = (pass) => {
     if (!pass) return { label: '', color: 'bg-transparent', width: 'w-0' };
@@ -55,7 +57,9 @@ const Signup = () => {
         role
       });
 
-      // Wait briefly for AuthContext to potentially pick up the change, though we can navigate directly
+      // Wait for AuthContext to pick it up and resolve the profile
+      await reloadProfile();
+
       if (role === 'artisan') {
         navigate('/seller/onboarding', { replace: true });
       } else {

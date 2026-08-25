@@ -1,6 +1,7 @@
 import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit, serverTimestamp, DocumentData, Query } from 'firebase/firestore';
 import { db, auth } from '../utils/firebase';
 import { Product } from '../types/product';
+import { createNotification } from './notificationService';
 
 export const getProducts = async (filters: { artisanId?: string; limit?: number } = {}): Promise<Product[]> => {
   let q: Query<DocumentData, DocumentData>;
@@ -32,12 +33,34 @@ export const createProduct = async (productData: Partial<Product>): Promise<Prod
     createdAt: serverTimestamp()
   };
   const docRef = await addDoc(collection(db, 'products'), data);
+  
+  if (auth.currentUser?.uid) {
+    createNotification({
+      userId: auth.currentUser.uid,
+      type: 'product_created',
+      title: 'Product Created',
+      message: `Your product "${productData.title || 'Untitled'}" was created successfully.`,
+      relatedProductId: docRef.id
+    });
+  }
+  
   return { _id: docRef.id, id: docRef.id, ...data } as Product;
 };
 
 export const updateProduct = async (id: string, productData: Partial<Product>): Promise<Product> => {
   const docRef = doc(db, 'products', id);
   await updateDoc(docRef, productData);
+  
+  if (auth.currentUser?.uid) {
+    createNotification({
+      userId: auth.currentUser.uid,
+      type: 'product_updated',
+      title: 'Product Updated',
+      message: `Your product "${productData.title || 'Untitled'}" was updated.`,
+      relatedProductId: id
+    });
+  }
+  
   return { _id: id, id, ...productData } as Product;
 };
 
