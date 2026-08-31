@@ -21,8 +21,14 @@ const ProductFormModal = ({
   const [isListening, setIsListening] = useState(false);
   const [isProcessingAudio, setIsProcessingAudio] = useState(false);
   const [audioError, setAudioError] = useState('');
+  const [transcriptionText, setTranscriptionText] = useState('');
+  const [englishTranslationText, setEnglishTranslationText] = useState('');
+  const [selectedLanguage, setSelectedLanguage] = useState('auto');
+  const [detectedLanguageName, setDetectedLanguageName] = useState('');
+  const [recordingTime, setRecordingTime] = useState(0);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
+  const timerRef = useRef(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [enhancedImage, setEnhancedImage] = useState(null);
   const [isPricing, setIsPricing] = useState(false);
@@ -30,6 +36,8 @@ const ProductFormModal = ({
 
   const startRecording = async () => {
     setAudioError('');
+    setTranscriptionText('');
+    setRecordingTime(0);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -41,6 +49,7 @@ const ProductFormModal = ({
       };
 
       mediaRecorder.onstop = async () => {
+        if (timerRef.current) clearInterval(timerRef.current);
         const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
         chunksRef.current = [];
         // stop all tracks
@@ -51,6 +60,9 @@ const ProductFormModal = ({
 
       mediaRecorder.start();
       setIsListening(true);
+      timerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
     } catch (err) {
       console.error('Error accessing microphone:', err);
       setAudioError('Microphone access denied or unavailable.');
@@ -58,9 +70,99 @@ const ProductFormModal = ({
   };
 
   const stopRecording = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
       setIsListening(false);
+    }
+  };
+
+  const extractProductFieldsFromSpeech = (transcription, availableCategories = []) => {
+    if (!transcription || !transcription.trim()) return {};
+    const lower = transcription.toLowerCase();
+
+    // 1. Material Extraction
+    let material = '';
+    const materialsMap = [
+      { keys: ['sambalpuri', 'ikkat', 'ikat', 'handloom', 'cotton', 'ସୂତା', 'ସମ୍ବଲପୁରୀ', 'सूती', 'सूती वस्त्र'], val: 'Natural Handloom Cotton' },
+      { keys: ['silk', 'tussar', 'tassar', 'ପାଟ', 'ସିଲ୍କ', 'रेशम', 'सिल्क', 'पाट'], val: 'Pure Tassar Silk' },
+      { keys: ['terracotta', 'clay', 'earthen', 'ମାଟି', 'मिट्टी', 'टेराकोटा'], val: 'Terracotta Clay' },
+      { keys: ['brass', 'dokra', 'dhokra', 'ପିତ୍ତଳ', 'पीतल', 'डोकरा'], val: 'Handcast Brass (Dokra)' },
+      { keys: ['wood', 'timber', 'bamboo', 'କାଠ', 'लकड़ी', 'बांस'], val: 'Natural Hardwood & Bamboo' },
+      { keys: ['jute', 'झूट'], val: 'Natural Jute Fiber' },
+      { keys: ['canvas', 'paper', 'ପଟ୍ଟଚିତ୍ର', 'चित्र'], val: 'Handmade Canvas & Natural Colors' }
+    ];
+
+    for (const m of materialsMap) {
+      if (m.keys.some(k => lower.includes(k))) {
+        material = m.val;
+        break;
+      }
+    }
+
+    // 2. Category Extraction
+    let category = (availableCategories && availableCategories[0]) || 'Textiles';
+    const categoryMap = [
+      { keys: ['saree', 'shati', 'शाड़ी', 'ଶାଢ଼ୀ', 'stole', 'dupatta', 'handloom', 'fabric', 'cloth', 'shawl', 'towel', 'gamucha', 'kurta', 'dress', 'weaved'], val: 'Textiles' },
+      { keys: ['pottery', 'clay', 'terracotta', 'pot', 'diya', 'matka', 'ମାଟି', 'घड़ा', 'दीया'], val: 'Pottery' },
+      { keys: ['painting', 'pattachitra', 'madhubani', 'art', 'wall art', 'चित्र', 'ଚିତ୍ର', 'canvas'], val: 'Paintings' },
+      { keys: ['jewelry', 'jewel', 'bangle', 'necklace', 'ring', 'gehna', 'ମାଳି', 'गहने'], val: 'Jewelry' },
+      { keys: ['wood', 'wooden', 'carving', 'toy', 'doll', 'ମୂର୍ତ୍ତି', 'खिलौना'], val: 'Woodwork' },
+      { keys: ['brass', 'dokra', 'metal', 'bell', 'statue', 'धोकरा', 'metalware'], val: 'Metalware' }
+    ];
+
+    for (const c of categoryMap) {
+      if (c.keys.some(k => lower.includes(k))) {
+        if (availableCategories && availableCategories.includes(c.val)) {
+          category = c.val;
+        }
+        break;
+      }
+    }
+
+    // 3. Title Extraction
+    let title = '';
+    if (lower.includes('sambalpuri') || lower.includes('ସମ୍ବଲପୁରୀ')) {
+      title = 'Handwoven Sambalpuri Handloom Saree';
+    } else if (lower.includes('pattachitra') || lower.includes('ପଟ୍ଟଚିତ୍ର')) {
+      title = 'Traditional Hand-Painted Pattachitra Artwork';
+    } else if (lower.includes('madhubani') || lower.includes('मधुबनी')) {
+      title = 'Hand-Painted Madhubani Folk Art';
+    } else if (lower.includes('terracotta') || lower.includes('ମାଟି')) {
+      title = 'Handcrafted Terracotta Decorative Craft';
+    } else if (lower.includes('dokra') || lower.includes('dhokra') || lower.includes('ପିତ୍ତଳ')) {
+      title = 'Authentic Tribal Dokra Brass Artifact';
+    } else {
+      const cleaned = transcription.trim().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, '');
+      const words = cleaned.split(/\s+/).slice(0, 6).join(' ');
+      title = words ? words.charAt(0).toUpperCase() + words.slice(1) : 'Handcrafted Artisan Product';
+    }
+
+    // 4. Description Generation
+    const description = transcription.trim();
+
+    return { title, category, material, description };
+  };
+
+  const applyExtractedFields = (textToExtract) => {
+    const targetText = textToExtract || transcriptionText;
+    if (!targetText) return;
+    const extracted = extractProductFieldsFromSpeech(targetText, CATEGORIES);
+    setNewProduct(prev => ({
+      ...prev,
+      title: extracted.title || prev.title || '',
+      category: extracted.category || prev.category || (CATEGORIES && CATEGORIES[0]),
+      material: extracted.material || prev.material || '',
+      description: extracted.description || prev.description || ''
+    }));
+
+    if (user?.uid) {
+      createNotification({
+        userId: user.uid,
+        type: 'catalog_success',
+        title: 'Form Auto-Filled',
+        message: 'Product Title, Category, Material, and Description have been populated from your voice recording!'
+      });
     }
   };
 
@@ -69,53 +171,48 @@ const ProductFormModal = ({
     setAudioError('');
     try {
       const formData = new FormData();
-      formData.append('audio_file', audioBlob, 'recording.webm');
+      formData.append('audio', audioBlob, 'recording.webm');
+      formData.append('language', selectedLanguage);
 
-      const response = await fetch('/api/ai/catalog', {
+      const asrBaseUrl = import.meta.env.VITE_ASR_API_URL || import.meta.env.NEXT_PUBLIC_ASR_API_URL || 'http://localhost:8000';
+      
+      const response = await fetch(`${asrBaseUrl}/transcribe`, {
         method: 'POST',
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error('AI Catalog API returned status ' + response.status);
+        throw new Error('ASR API returned status ' + response.status);
       }
 
       const data = await response.json();
       if (!data.success) {
-        throw new Error(data.error || 'Failed to generate catalog');
+        throw new Error(data.error || 'Failed to transcribe audio');
       }
 
-      const { catalog } = data;
-      setNewProduct(p => ({
-        ...p,
-        title: catalog.title || p.title,
-        category: catalog.category || p.category,
-        material: catalog.material || p.material,
-        description: catalog.descriptionEnglish || p.description,
-        descriptionHindi: catalog.descriptionHindi || p.descriptionHindi,
-        seoKeywords: catalog.seoKeywords || p.seoKeywords,
-        color: catalog.color || p.color,
-        craftType: catalog.craftType || p.craftType,
-        tags: catalog.tags || p.tags,
-      }));
+      const transcribed = data.text || '';
+      const englishText = data.english_text || transcribed;
+      setTranscriptionText(transcribed);
+      setEnglishTranslationText(englishText);
+      setDetectedLanguageName(data.language_name || data.language || 'Auto Detected');
       
       if (user?.uid) {
         createNotification({
           userId: user.uid,
           type: 'catalog_success',
-          title: 'Catalog Generated',
-          message: 'Your product details were successfully generated using voice AI.'
+          title: 'Speech Transcribed',
+          message: `Voice recording transcribed and translated into English (${data.language_name || 'Multi-lingual'}).`
         });
       }
     } catch (err) {
       console.error('Error processing audio:', err);
-      setAudioError('Failed to generate catalog from audio. Please try again or type manually.');
+      setAudioError('Unable to transcribe the recording. Please try again.');
       if (user?.uid) {
         createNotification({
           userId: user.uid,
           type: 'catalog_failed',
-          title: 'Catalog Generation Failed',
-          message: 'Something went wrong while creating your catalog. You can continue editing manually.'
+          title: 'Transcription Failed',
+          message: 'Something went wrong while transcribing your voice. Please try again.'
         });
       }
     } finally {
@@ -226,42 +323,107 @@ const ProductFormModal = ({
             </div>
           ) : (
             <form onSubmit={handleAddProduct} className="p-6 space-y-5">
-              {/* Multilingual Voice Cataloging Feature */}
-              <div className="bg-terracotta-50/50 border border-terracotta-200 rounded-xl p-4 flex flex-col gap-2">
-                <div className="flex items-center justify-between">
+              {/* IndicConformer Multilingual Voice Recording Feature */}
+              <div className="bg-terracotta-50/50 border border-terracotta-200 rounded-xl p-4 flex flex-col gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <h4 className="text-sm font-bold text-earth-900 flex items-center gap-1">
-                      <Mic size={16} className="text-terracotta-500" /> Multilingual Voice Cataloging
+                    <h4 className="text-sm font-bold text-earth-900 flex items-center gap-1.5">
+                      <Mic size={16} className="text-terracotta-500" /> Multilingual Voice Recording
                     </h4>
-                    <p className="text-xs text-earth-500 mt-1">Speak in your native language to auto-fill details.</p>
+                    <p className="text-xs text-earth-500 mt-0.5">
+                      {isListening ? (
+                        <span className="text-red-600 font-semibold flex items-center gap-1">
+                          🔴 Recording {String(Math.floor(recordingTime / 60)).padStart(2, '0')}:{String(recordingTime % 60).padStart(2, '0')}
+                        </span>
+                      ) : isProcessingAudio ? (
+                        <span className="text-terracotta-600 font-medium">⏳ Transcribing...</span>
+                      ) : (
+                        'Speak in any Indian language to transcribe.'
+                      )}
+                    </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleVoiceCataloging}
-                    disabled={isProcessingAudio}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 ${
-                      isListening ? 'bg-red-500 text-white animate-pulse hover:bg-red-600 shadow-sm' : 
-                      isProcessingAudio ? 'bg-terracotta-200 text-terracotta-700 cursor-not-allowed' : 'bg-terracotta-600 text-white hover:bg-terracotta-500 shadow-sm'
-                    }`}
-                  >
-                    {isProcessingAudio ? (
-                      <><Loader2 size={14} className="animate-spin" /> Processing AI...</>
-                    ) : isListening ? (
-                      <><Mic size={14} /> Stop Recording</>
-                    ) : (
-                      <><Mic size={14} /> Start Speaking</>
-                    )}
-                  </button>
+                  
+                  <div className="flex items-center gap-2 shrink-0">
+                    <select
+                      value={selectedLanguage}
+                      onChange={(e) => setSelectedLanguage(e.target.value)}
+                      disabled={isListening || isProcessingAudio}
+                      className="px-2.5 py-1.5 bg-white border border-terracotta-200 rounded-lg text-xs font-semibold text-earth-800 focus:outline-none focus:border-terracotta-500 shadow-sm"
+                    >
+                      <option value="auto">🌐 Auto Detect</option>
+                      <option value="or">🇮🇳 Odia (ଓଡ଼ିଆ)</option>
+                      <option value="hi">🇮🇳 Hindi (हिंदी)</option>
+                      <option value="bn">🇮🇳 Bengali (বাংলা)</option>
+                      <option value="ta">🇮🇳 Tamil (தமிழ்)</option>
+                      <option value="te">🇮🇳 Telugu (తెలుగు)</option>
+                      <option value="mr">🇮🇳 Marathi (मराठी)</option>
+                      <option value="gu">🇮🇳 Gujarati (ગુજરાતી)</option>
+                      <option value="kn">🇮🇳 Kannada (ಕನ್ನಡ)</option>
+                      <option value="ml">🇮🇳 Malayalam (മലയാളം)</option>
+                      <option value="pa">🇮🇳 Punjabi (ਪੰਜਾਬੀ)</option>
+                      <option value="as">🇮🇳 Assamese (অসমୀয়া)</option>
+                      <option value="ur">🇮🇳 Urdu (اردو)</option>
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={handleVoiceCataloging}
+                      disabled={isProcessingAudio}
+                      className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 ${
+                        isListening ? 'bg-red-500 text-white animate-pulse hover:bg-red-600 shadow-sm' : 
+                        isProcessingAudio ? 'bg-terracotta-200 text-terracotta-700 cursor-not-allowed' : 'bg-terracotta-600 text-white hover:bg-terracotta-500 shadow-sm'
+                      }`}
+                    >
+                      {isProcessingAudio ? (
+                        <><Loader2 size={14} className="animate-spin" /> Transcribing...</>
+                      ) : isListening ? (
+                        <><Mic size={14} /> Stop Recording</>
+                      ) : (
+                        <><Mic size={14} /> Record Voice</>
+                      )}
+                    </button>
+                  </div>
                 </div>
+                
                 {audioError && (
                   <p className="text-xs text-red-500 font-medium">{audioError}</p>
                 )}
-                {newProduct.descriptionHindi && (
-                  <div className="bg-white p-3 rounded-lg border border-terracotta-100 mt-2 text-xs">
-                    <span className="font-bold text-earth-700 block mb-1">Generated Hindi Description (Saved as metadata):</span>
-                    <span className="text-earth-600">{newProduct.descriptionHindi}</span>
+
+                {/* Voice Transcription Preview Card directly below Record Voice */}
+                <div className="bg-white p-4 rounded-xl border border-terracotta-200 text-xs shadow-sm mt-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-bold text-earth-900 flex items-center gap-1.5 text-xs">
+                      📝 Voice Transcription
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-terracotta-100 text-terracotta-800 font-bold">
+                      {detectedLanguageName || (selectedLanguage === 'auto' ? 'Auto Detect' : selectedLanguage.toUpperCase())}
+                    </span>
                   </div>
-                )}
+
+                  {isProcessingAudio ? (
+                    <p className="text-earth-500 italic py-2">⏳ Transcribing your voice...</p>
+                  ) : isListening ? (
+                    <p className="text-red-500 italic py-2">🔴 Recording...</p>
+                  ) : transcriptionText ? (
+                    <div className="flex flex-col gap-2.5">
+                      <div className="bg-earth-50 p-3 rounded-lg border border-earth-200 text-earth-900 text-sm leading-relaxed select-all">
+                        <span className="text-[10px] font-bold text-earth-500 uppercase tracking-wider block mb-1">Original Voice Audio:</span>
+                        {transcriptionText}
+                      </div>
+
+                      {englishTranslationText && (
+                        <div className="bg-terracotta-50/70 p-3 rounded-lg border border-terracotta-200 text-earth-900 text-sm leading-relaxed select-all">
+                          <span className="text-[10px] font-bold text-terracotta-700 uppercase tracking-wider flex items-center gap-1 mb-1">
+                            🇬🇧 English Translation:
+                          </span>
+                          {englishTranslationText}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-earth-400 italic py-1">Your voice transcription will appear here.</p>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -571,10 +733,10 @@ const ProductFormModal = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || (!newProduct.image && !isEditing) || imageUploading.image || imageUploading.image2}
+                  disabled={isSubmitting || imageUploading.image || imageUploading.image2}
                   className="flex-1 py-3 bg-earth-900 text-white font-bold uppercase tracking-wider rounded-lg hover:bg-terracotta-600 transition-colors disabled:opacity-60"
                 >
-                  {isSubmitting ? (isEditing ? 'Saving...' : 'Adding...') : (!newProduct.image && !isEditing) ? 'Upload Photo First' : (isEditing ? 'Save Changes' : 'Add to Catalog')}
+                  {isSubmitting ? (isEditing ? 'Saving...' : 'Adding...') : (isEditing ? 'Save Changes' : 'Add to Catalog')}
                 </button>
               </div>
             </form>

@@ -238,7 +238,24 @@ const useArtisanDashboard = () => {
     }
   };
 
+  const openAddProductModal = () => {
+    setIsEditing(false);
+    setEditProductId(null);
+    setNewProduct({
+      title: '', category: CATEGORIES[0],
+      material: '', description: '', 
+      rawMaterialCost: '', laborCost: '', additionalCost: '',
+      price: '', aiSuggestedPrice: null, priceRangeMin: null, priceRangeMax: null, aiPricingConfidence: '', aiPricingExplanation: '', aiPricingFactors: [], pricingUpdatedAt: null,
+      image: '', image2: ''
+    });
+    setShowModal(true);
+  };
+
   const startEditProduct = (prod) => {
+    if (!prod || !prod._id) {
+      openAddProductModal();
+      return;
+    }
     setIsEditing(true);
     setEditProductId(prod._id);
     setNewProduct({
@@ -281,6 +298,7 @@ const useArtisanDashboard = () => {
     handleAddProduct,
     deleteProduct,
     startEditProduct,
+    openAddProductModal,
     CATEGORIES,
     enquiries
   };

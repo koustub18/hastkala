@@ -86,14 +86,7 @@ const ArtisanDashboard = () => {
 
            <div className="flex items-center gap-3 mt-8 md:mt-0">
                <button
-                onClick={() => {
-                   dashboardState.setIsEditing(false);
-                   dashboardState.setNewProduct({
-                     title: '', category: dashboardState.CATEGORIES[0],
-                     material: '', image: '', image2: ''
-                   });
-                   dashboardState.setShowModal(true);
-                }}
+                onClick={dashboardState.openAddProductModal}
                 className="bg-terracotta-600 hover:bg-terracotta-500 text-white font-bold uppercase tracking-wider text-xs px-6 py-4 rounded-xl shadow-xl shadow-terracotta-900/20 flex items-center gap-2 transition-all duration-300 hover:-translate-y-1"
               >
                  <Plus size={16} /> List New Product
@@ -139,6 +132,7 @@ const ArtisanDashboard = () => {
                 products={dashboardState.products} 
                 startEditProduct={dashboardState.startEditProduct} 
                 deleteProduct={dashboardState.deleteProduct}
+                openAddProductModal={dashboardState.openAddProductModal}
               />
             ) : (
               <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-earth-200/60 overflow-hidden">

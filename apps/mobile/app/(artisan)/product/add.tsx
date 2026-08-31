@@ -21,11 +21,13 @@ export default function AddProductScreen() {
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
   const [voiceError, setVoiceError] = useState('');
-  const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:5001';
+  const [transcriptionText, setTranscriptionText] = useState('');
+  const ASR_API_URL = process.env.EXPO_PUBLIC_ASR_API_URL || 'http://10.0.2.2:8000';
 
   const startRecording = async () => {
     try {
       setVoiceError('');
+      setTranscriptionText('');
       const permission = await Audio.requestPermissionsAsync();
       if (permission.status === 'granted') {
         await Audio.setAudioModeAsync({
@@ -62,16 +64,17 @@ export default function AddProductScreen() {
       if (!uri) throw new Error('No recording URI found');
 
       const formData = new FormData();
-      formData.append('audio_file', {
+      formData.append('audio', {
         uri,
         name: 'catalog_voice.m4a',
         type: 'audio/m4a',
       } as any);
+      formData.append('language', 'or');
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 60000);
 
-      const response = await fetch(`${API_URL}/api/ai/catalog`, {
+      const response = await fetch(`${ASR_API_URL}/transcribe`, {
         method: 'POST',
         body: formData,
         signal: controller.signal,
@@ -84,26 +87,13 @@ export default function AddProductScreen() {
       const data = await response.json();
       
       if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to generate catalog');
+        throw new Error(data.error || 'Failed to transcribe audio');
       }
 
-      const generated = data.catalog;
-      if (generated) {
-        if (generated.title && !title) setTitle(generated.title);
-        if (generated.category && !category) setCategory(generated.category);
-        
-        let desc = description;
-        if (generated.descriptionEnglish) desc = generated.descriptionEnglish;
-        if (generated.descriptionHindi) desc += `\n\nGenerated Hindi Description:\n${generated.descriptionHindi}`;
-        if (generated.material) desc += `\n\nMaterial: ${generated.material}`;
-        if (generated.color) desc += `\nColor: ${generated.color}`;
-        if (generated.craftType) desc += `\nCraft: ${generated.craftType}`;
-        
-        setDescription(desc);
-      }
+      setTranscriptionText(data.text || '');
     } catch (err: any) {
       console.error('Processing error', err);
-      setVoiceError(err.message || 'Error processing audio');
+      setVoiceError('Unable to transcribe the recording. Please try again.');
     } finally {
       setIsProcessingVoice(false);
       await Audio.setAudioModeAsync({
@@ -160,9 +150,11 @@ export default function AddProductScreen() {
       <View style={styles.voiceCard}>
         <View style={styles.voiceHeader}>
           <Mic color="#8B4513" size={20} />
-          <Text style={styles.voiceTitle}>Multilingual Voice Cataloging</Text>
+          <Text style={styles.voiceTitle}>Voice Recording (IndicConformer Odia)</Text>
         </View>
-        <Text style={styles.voiceSubtitle}>Speak in your native language to auto-fill details.</Text>
+        <Text style={styles.voiceSubtitle}>
+          {recording ? '🔴 Recording...' : isProcessingVoice ? '⏳ Transcribing...' : 'Record your voice in Odia.'}
+        </Text>
         
         {voiceError ? <Text style={styles.errorText}>{voiceError}</Text> : null}
 
@@ -183,7 +175,7 @@ export default function AddProductScreen() {
           {isProcessingVoice ? (
             <View style={styles.voiceButtonContent}>
               <ActivityIndicator color="#8B4513" size="small" />
-              <Text style={[styles.voiceButtonText, { color: '#8B4513' }]}>Processing AI...</Text>
+              <Text style={[styles.voiceButtonText, { color: '#8B4513' }]}>Transcribing...</Text>
             </View>
           ) : recording ? (
             <View style={styles.voiceButtonContent}>
@@ -193,10 +185,27 @@ export default function AddProductScreen() {
           ) : (
             <View style={styles.voiceButtonContent}>
               <Mic color="white" size={16} />
-              <Text style={[styles.voiceButtonText, { color: 'white' }]}>Start Speaking</Text>
+              <Text style={[styles.voiceButtonText, { color: 'white' }]}>Record Voice</Text>
             </View>
           )}
         </TouchableOpacity>
+
+        {/* Voice Transcription Container directly below record voice */}
+        <View style={{ marginTop: 12, backgroundColor: '#FFFFFF', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#FFE0B2' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#8B4513' }}>📝 Voice Transcription</Text>
+            <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#D84315', backgroundColor: '#FFE0B2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>Odia (or)</Text>
+          </View>
+          {isProcessingVoice ? (
+            <Text style={{ fontSize: 13, color: '#8B4513', fontStyle: 'italic' }}>⏳ Transcribing your voice...</Text>
+          ) : recording ? (
+            <Text style={{ fontSize: 13, color: '#D32F2F', fontStyle: 'italic' }}>🔴 Recording...</Text>
+          ) : transcriptionText ? (
+            <Text style={{ fontSize: 14, color: '#2F4F4F', leading: 20 }}>{transcriptionText}</Text>
+          ) : (
+            <Text style={{ fontSize: 12, color: '#9E9E9E', fontStyle: 'italic' }}>Your voice transcription will appear here.</Text>
+          )}
+        </View>
       </View>
 
       <Text style={styles.label}>Product Title *</Text>
