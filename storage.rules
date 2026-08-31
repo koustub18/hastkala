@@ -25,6 +25,19 @@ service firebase.storage {
         (request.auth.uid == userId || isAdmin());
     }
 
+    match /verifications/{userId}/{fileName} {
+      // READ: Only the artisan who owns the path, OR admin
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      
+      // WRITE: Only the artisan who owns the path, OR admin
+      allow create, update: if request.auth != null && 
+        (request.auth.uid == userId || isAdmin()) &&
+        request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/(jpeg|png|webp)|application/pdf');
+
+      allow delete: if request.auth != null && (request.auth.uid == userId || isAdmin());
+    }
+
     // Default deny for all other paths
     match /{allPaths=**} {
       allow read, write: if false;

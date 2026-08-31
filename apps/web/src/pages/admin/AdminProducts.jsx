@@ -71,8 +71,8 @@ const AdminProducts = () => {
                 filteredProducts.map(product => (
                   <tr key={product.id} className="hover:bg-earth-50 transition-colors">
                     <td className="p-4">
-                      {product.images && product.images.length > 0 ? (
-                        <img src={resolveImageUrl(product.images[0])} alt={product.title} className="w-10 h-10 object-cover rounded shadow-sm border border-earth-200" />
+                      {(product.image || (product.images && product.images.length > 0)) ? (
+                        <img src={resolveImageUrl(product.image || product.images[0])} alt={product.title} className="w-10 h-10 object-cover rounded shadow-sm border border-earth-200" />
                       ) : (
                         <div className="w-10 h-10 bg-earth-100 rounded flex items-center justify-center text-earth-400">
                           <ImageIcon size={16} />

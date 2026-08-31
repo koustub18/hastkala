@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { IndianRupee, Sparkles, CheckCircle2, ChevronRight, X, Loader2, Upload, ImageIcon, Mic, Wand2, Calculator, Info } from 'lucide-react';
 import { getPriceSuggestion, createNotification } from '@hastkala/core';
@@ -25,56 +25,132 @@ const ProductFormModal = ({
   const [englishTranslationText, setEnglishTranslationText] = useState('');
   const [selectedLanguage, setSelectedLanguage] = useState('auto');
   const [detectedLanguageName, setDetectedLanguageName] = useState('');
+  const [voiceSuccess, setVoiceSuccess] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [enhancedImage, setEnhancedImage] = useState(null);
+  const [originalImage, setOriginalImage] = useState(null);
+  const [selectedImageFile, setSelectedImageFile] = useState(null);
+  const [enhanceError, setEnhanceError] = useState('');
   const [isPricing, setIsPricing] = useState(false);
   const [pricingError, setPricingError] = useState('');
 
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        if (mediaRecorderRef.current.stream) {
+          mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+        }
+        try { mediaRecorderRef.current.stop(); } catch (e) {}
+      }
+    };
+  }, []);
+
   const startRecording = async () => {
+    if (isListening || isProcessingAudio) return;
     setAudioError('');
     setTranscriptionText('');
+    setVoiceSuccess(false);
     setRecordingTime(0);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Microphone is not available.');
+      }
+
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err) {
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          throw new Error('Microphone permission is needed.');
+        }
+        throw new Error('Microphone is not available.');
+      }
+      
+      const mimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus', 'audio/mp3'];
+      let selectedMimeType = '';
+      for (const type of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          selectedMimeType = type;
+          break;
+        }
+      }
+      
+      const options = selectedMimeType ? { mimeType: selectedMimeType } : {};
+      const mediaRecorder = new MediaRecorder(stream, options);
+      
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
       mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
+        if (e.data && e.data.size > 0) {
+          chunksRef.current.push(e.data);
+        }
       };
 
       mediaRecorder.onstop = async () => {
-        if (timerRef.current) clearInterval(timerRef.current);
-        const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        chunksRef.current = [];
-        // stop all tracks
+
         stream.getTracks().forEach(track => track.stop());
+        if (timerRef.current) clearInterval(timerRef.current);
         
+        if (chunksRef.current.length === 0) {
+            setAudioError('No voice was captured. Please try again.');
+            setIsListening(false);
+            return;
+        }
+
+        const audioType = selectedMimeType || 'audio/webm';
+        const audioBlob = new Blob(chunksRef.current, { type: audioType });
+        
+        chunksRef.current = [];
+        mediaRecorderRef.current = null;
+        
+        if (audioBlob.size === 0) {
+            setAudioError('No voice was captured. Please try again.');
+            setIsListening(false);
+            return;
+        }
+        
+        setIsListening(false);
         await processAudio(audioBlob);
       };
 
-      mediaRecorder.start();
+      mediaRecorder.start(200); // capture chunks every 200ms
       setIsListening(true);
       timerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
+        setRecordingTime(prev => {
+          if (prev >= 59) {
+            stopRecording();
+            return 60;
+          }
+          return prev + 1;
+        });
       }, 1000);
     } catch (err) {
       console.error('Error accessing microphone:', err);
-      setAudioError('Microphone access denied or unavailable.');
+      setAudioError(err.message || 'Microphone is not available.');
+      setIsListening(false);
     }
   };
 
   const stopRecording = () => {
     if (timerRef.current) clearInterval(timerRef.current);
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state === 'inactive') {
       setIsListening(false);
+      return;
     }
+    
+    try {
+      recorder.requestData();
+    } catch (e) {
+      console.warn('requestData failed:', e);
+    }
+    recorder.stop();
   };
 
   const extractProductFieldsFromSpeech = (transcription, availableCategories = []) => {
@@ -169,6 +245,7 @@ const ProductFormModal = ({
   const processAudio = async (audioBlob) => {
     setIsProcessingAudio(true);
     setAudioError('');
+    setVoiceSuccess(false);
     try {
       const formData = new FormData();
       formData.append('audio', audioBlob, 'recording.webm');
@@ -195,6 +272,11 @@ const ProductFormModal = ({
       setTranscriptionText(transcribed);
       setEnglishTranslationText(englishText);
       setDetectedLanguageName(data.language_name || data.language || 'Auto Detected');
+      
+      applyExtractedFields(englishText);
+      
+      setVoiceSuccess(true);
+      setTimeout(() => setVoiceSuccess(false), 5000);
       
       if (user?.uid) {
         createNotification({
@@ -228,21 +310,69 @@ const ProductFormModal = ({
     }
   };
 
-  const handleEnhanceImage = () => {
-    if (!newProduct.image) return;
+  const handleEnhanceImage = async () => {
+    if (!selectedImageFile && !newProduct.image) return;
     setIsEnhancing(true);
-    setTimeout(() => {
-      setIsEnhancing(false);
-      setEnhancedImage(newProduct.image);
+    setEnhanceError('');
+    setEnhancedImage(null);
+    
+    // If we have a newly selected file, use that, otherwise use the existing URL (for edits)
+    if (!originalImage) {
+        setOriginalImage(selectedImageFile ? URL.createObjectURL(selectedImageFile) : newProduct.image);
+    }
+    
+    try {
+      let blob;
+      if (selectedImageFile) {
+          blob = selectedImageFile;
+      } else {
+          const res = await fetch(newProduct.image);
+          blob = await res.blob();
+      }
+
+      if (!blob) throw new Error("Could not read image data");
+
+      const formData = new FormData();
+      formData.append('image_file', blob, 'image.jpg');
+
+      const response = await fetch('/api/ai/enhance', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to enhance image');
+      }
+
+      const data = await response.json();
+      if (data.success && data.base64Image) {
+        const enhancedDataUrl = `data:${data.mimeType};base64,${data.base64Image}`;
+        setEnhancedImage(enhancedDataUrl);
+        if (user?.uid) {
+          createNotification({
+            userId: user.uid,
+            type: 'image_enhanced_success',
+            title: 'Image Enhanced',
+            message: 'Your product image was successfully enhanced with AI.'
+          });
+        }
+      } else {
+        throw new Error("Enhancement failed on server");
+      }
+    } catch (err) {
+      console.error('Enhancement error:', err);
+      setEnhanceError("Couldn't improve the photo. You can use the original image.");
       if (user?.uid) {
         createNotification({
           userId: user.uid,
-          type: 'image_enhanced_success',
-          title: 'Image Enhanced',
-          message: 'Your product image was successfully enhanced with AI.'
+          type: 'image_enhanced_failed',
+          title: 'Enhancement Failed',
+          message: 'Could not improve the photo. Try again or use the original.'
         });
       }
-    }, 2000);
+    } finally {
+      setIsEnhancing(false);
+    }
   };
 
   const handleSuggestPrice = async () => {
@@ -371,13 +501,19 @@ const ProductFormModal = ({
                       disabled={isProcessingAudio}
                       className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 ${
                         isListening ? 'bg-red-500 text-white animate-pulse hover:bg-red-600 shadow-sm' : 
-                        isProcessingAudio ? 'bg-terracotta-200 text-terracotta-700 cursor-not-allowed' : 'bg-terracotta-600 text-white hover:bg-terracotta-500 shadow-sm'
+                        isProcessingAudio ? 'bg-terracotta-200 text-terracotta-700 cursor-not-allowed' : 
+                        voiceSuccess ? 'bg-green-500 text-white shadow-sm hover:bg-green-600' :
+                        'bg-terracotta-600 text-white hover:bg-terracotta-500 shadow-sm'
                       }`}
                     >
                       {isProcessingAudio ? (
                         <><Loader2 size={14} className="animate-spin" /> Transcribing...</>
                       ) : isListening ? (
-                        <><Mic size={14} /> Stop Recording</>
+                        <><Mic size={14} /> Listening... {recordingTime}s (Stop)</>
+                      ) : voiceSuccess ? (
+                        <><CheckCircle2 size={14} /> Transcribed!</>
+                      ) : audioError ? (
+                        <><Mic size={14} /> Try Again</>
                       ) : (
                         <><Mic size={14} /> Record Voice</>
                       )}
@@ -621,67 +757,134 @@ const ProductFormModal = ({
                     </div>
                   </motion.div>
                 )}
-              </div>              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-xs font-bold text-earth-700 uppercase tracking-wider">Main Product Photo *</label>
-                  {newProduct.image && (
-                    <button
-                      type="button"
-                      onClick={handleEnhanceImage}
-                      disabled={isEnhancing || enhancedImage === newProduct.image}
-                      className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-terracotta-600 hover:text-terracotta-700 transition-colors disabled:opacity-50"
-                    >
-                      <Wand2 size={11} />
-                      {isEnhancing ? 'Enhancing...' : enhancedImage === newProduct.image ? 'AI Enhanced' : 'Enhance with AI'}
-                    </button>
-                  )}
-                </div>
-                <div className="flex gap-3 items-center">
-                  <label htmlFor="main-image-upload" className="flex-1 cursor-pointer">
-                    <input
-                      id="main-image-upload"
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        console.log("File selected for main image:", file);
-                        if (file) uploadImage(file, 'image');
-                      }}
-                    />
-                    <div className={`flex items-center justify-center gap-3 px-4 py-3 border-2 border-dashed rounded-lg transition-colors ${
-                      newProduct.image 
-                        ? 'border-green-300 bg-green-50/50' 
-                        : 'border-earth-300 bg-earth-50 hover:border-terracotta-400 hover:bg-terracotta-50/30'
-                    }`}>
-                      {imageUploading.image ? (
-                        <><Loader2 size={18} className="text-terracotta-500 animate-spin" /><span className="text-sm text-terracotta-600 font-medium">Uploading...</span></>
-                      ) : newProduct.image ? (
-                        <><CheckCircle2 size={18} className="text-green-600" /><span className="text-sm text-green-700 font-medium">Photo uploaded — tap to change</span></>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-earth-700 uppercase tracking-wider mb-2">Main Product Photo *</label>
+                
+                {originalImage ? (
+                   <div className="bg-white p-4 rounded-xl border border-earth-200 shadow-sm">
+                      {isEnhancing ? (
+                         <div className="flex flex-col items-center justify-center py-6">
+                            <Loader2 size={32} className="text-terracotta-500 animate-spin mb-3" />
+                            <p className="text-earth-700 font-bold">Improving your photo...</p>
+                            <p className="text-xs text-earth-500">Removing background and enhancing lighting</p>
+                         </div>
+                      ) : enhanceError ? (
+                         <div className="flex flex-col items-center justify-center py-6">
+                            <div className="text-red-500 font-bold mb-4">{enhanceError}</div>
+                            <img src={originalImage} alt="original" className="w-32 h-32 object-cover rounded-lg border-2 border-earth-200 mb-4" />
+                            <button type="button" onClick={() => { 
+                               if (selectedImageFile) uploadImage(selectedImageFile, 'image');
+                               setOriginalImage(null); 
+                               setEnhanceError(''); 
+                            }} className="px-6 py-2 bg-earth-900 text-white rounded-lg font-bold">Use Original Photo</button>
+                         </div>
+                      ) : enhancedImage ? (
+                         <div className="flex flex-col items-center">
+                            <h3 className="font-bold text-forest-600 mb-4 flex items-center gap-2"><Sparkles size={16}/> Photo improved</h3>
+                            <div className="flex gap-4 mb-6 w-full">
+                               <div className="flex-1">
+                                  <span className="text-[10px] font-bold text-earth-500 uppercase block mb-1 text-center">Before</span>
+                                  <img src={originalImage} alt="before" className="w-full h-32 object-contain bg-earth-50 rounded-lg border border-earth-200" />
+                               </div>
+                               <div className="flex-1">
+                                  <span className="text-[10px] font-bold text-terracotta-600 uppercase block mb-1 text-center">After</span>
+                                  <img src={enhancedImage} alt="after" className="w-full h-32 object-contain bg-earth-50 rounded-lg border-2 border-terracotta-400 shadow-md" />
+                               </div>
+                            </div>
+                            <div className="flex flex-col sm:flex-row gap-3 w-full">
+                               <button type="button" onClick={() => { 
+                                   if (selectedImageFile) uploadImage(selectedImageFile, 'image');
+                                   setOriginalImage(null); 
+                                   setEnhancedImage(null); 
+                               }} className="flex-1 py-3 border border-earth-200 text-earth-700 rounded-lg font-bold hover:bg-earth-50 transition-colors">Use Original Photo</button>
+                               <button type="button" onClick={() => { 
+                                   try {
+                                     const arr = enhancedImage.split(',');
+                                     const mime = arr[0].match(/:(.*?);/)[1];
+                                     const bstr = atob(arr[1]);
+                                     let n = bstr.length;
+                                     const u8arr = new Uint8Array(n);
+                                     while(n--){
+                                         u8arr[n] = bstr.charCodeAt(n);
+                                     }
+                                     const file = new File([u8arr], "enhanced.jpg", {type:mime});
+                                     uploadImage(file, 'image');
+                                   } catch (e) {
+                                     console.error(e);
+                                   }
+                                   setOriginalImage(null); 
+                                   setEnhancedImage(null); 
+                               }} className="flex-1 py-3 bg-terracotta-600 text-white rounded-lg font-bold hover:bg-terracotta-700 shadow-lg shadow-terracotta-900/20 transition-colors">Use Enhanced Photo</button>
+                            </div>
+                            <button type="button" onClick={() => { setEnhancedImage(null); handleEnhanceImage(); }} className="mt-4 text-xs text-earth-500 hover:text-earth-700 underline transition-colors">Try Again</button>
+                         </div>
                       ) : (
-                        <><Upload size={18} className="text-earth-500" /><span className="text-sm text-earth-600 font-medium">Tap to pick from Gallery</span></>
-                      )}
-                    </div>
-                  </label>
-                  {newProduct.image ? (
-                    <div className="relative shrink-0">
-                      <img 
-                        src={newProduct.image} 
-                        alt="preview" 
-                        className={`w-14 h-14 object-cover rounded-lg border-2 ${enhancedImage === newProduct.image ? 'border-terracotta-400 filter contrast-125 saturate-150 brightness-110' : 'border-green-300'} shadow-sm transition-all duration-500`} 
-                      />
-                      {enhancedImage === newProduct.image && (
-                         <div className="absolute -top-2 -right-2 bg-terracotta-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider z-10 shadow-sm">
-                           AI
+                         <div className="flex flex-col items-center">
+                            <h3 className="font-bold text-earth-800 mb-4 flex items-center gap-2">Image Selected</h3>
+                            <img src={originalImage} alt="selected" className="w-full h-48 object-contain bg-earth-50 rounded-lg border border-earth-200 mb-6" />
+                            <div className="flex flex-col sm:flex-row gap-3 w-full">
+                               <button type="button" onClick={() => { 
+                                   if (selectedImageFile) uploadImage(selectedImageFile, 'image');
+                                   setOriginalImage(null); 
+                               }} className="flex-1 py-3 border border-earth-200 text-earth-700 rounded-lg font-bold hover:bg-earth-50 transition-colors">Use As Is</button>
+                               <button type="button" onClick={handleEnhanceImage} className="flex-1 py-3 bg-earth-900 text-white rounded-lg font-bold flex justify-center items-center gap-2 hover:bg-earth-800 shadow-md transition-colors"><Sparkles size={18} /> ✨ Improve Photo</button>
+                            </div>
                          </div>
                       )}
+                   </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex gap-3 items-center">
+                      <label htmlFor="main-image-upload" className="flex-1 cursor-pointer">
+                        <input
+                          id="main-image-upload"
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                               setSelectedImageFile(file);
+                               setOriginalImage(URL.createObjectURL(file));
+                            }
+                          }}
+                        />
+                        <div className={`flex items-center justify-center gap-3 px-4 py-3 border-2 border-dashed rounded-lg transition-colors ${
+                          newProduct.image 
+                            ? 'border-green-300 bg-green-50/50' 
+                            : 'border-earth-300 bg-earth-50 hover:border-terracotta-400 hover:bg-terracotta-50/30'
+                        }`}>
+                          {imageUploading.image ? (
+                            <><Loader2 size={18} className="text-terracotta-500 animate-spin" /><span className="text-sm text-terracotta-600 font-medium">Uploading...</span></>
+                          ) : newProduct.image ? (
+                            <><CheckCircle2 size={18} className="text-green-600" /><span className="text-sm text-green-700 font-medium">Photo uploaded — tap to change</span></>
+                          ) : (
+                            <><Upload size={18} className="text-earth-500" /><span className="text-sm text-earth-600 font-medium">Tap to pick from Gallery</span></>
+                          )}
+                        </div>
+                      </label>
+                      {newProduct.image ? (
+                        <div className="relative shrink-0">
+                          <img 
+                            src={newProduct.image} 
+                            alt="preview" 
+                            className="w-14 h-14 object-cover rounded-lg border-2 border-green-300 shadow-sm transition-all duration-500" 
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-14 h-14 bg-earth-100 rounded-lg border border-earth-200 flex items-center justify-center shrink-0">
+                          <ImageIcon size={20} className="text-earth-400" />
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="w-14 h-14 bg-earth-100 rounded-lg border border-earth-200 flex items-center justify-center shrink-0">
-                      <ImageIcon size={20} className="text-earth-400" />
-                    </div>
-                  )}
-                </div>
+                    {newProduct.image && (
+                       <button type="button" onClick={handleEnhanceImage} className="w-full py-3 bg-earth-900 text-white rounded-lg font-bold flex items-center justify-center gap-2 shadow-md hover:bg-earth-800 transition-colors">
+                          <Sparkles size={18} /> ✨ Improve Photo
+                       </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -695,7 +898,7 @@ const ProductFormModal = ({
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        console.log("File selected for second image:", file);
+
                         if (file) uploadImage(file, 'image2');
                       }}
                     />

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 // eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
@@ -38,55 +38,53 @@ const Login = () => {
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { reloadProfile } = useAuth();
+  const { authState, profile, user } = useAuth();
   const [searchParams] = useSearchParams();
   const isAdminFlow = searchParams.get('role') === 'admin';
+  const [isAttemptingLogin, setIsAttemptingLogin] = useState(false);
+
+  useEffect(() => {
+    if (authState === 'ready' && user && profile) {
+      if (isAdminFlow && profile.role !== 'admin') {
+        logoutUser().then(() => {
+          setError('Admin access required.');
+          setIsLoading(false);
+          setIsAttemptingLogin(false);
+        });
+        return;
+      }
+
+      if (isAttemptingLogin) {
+        toast.success(`Welcome back, ${profile.name?.split(' ')[0] || 'there'}! 👋`);
+      }
+
+      if (profile.role === 'customer') {
+        navigate('/', { replace: true });
+      } else if (profile.role === 'artisan') {
+        if (!profile.hasOnboarded) {
+          navigate('/seller/onboarding', { replace: true });
+        } else if (profile.status === 'pending' || profile.status === 'rejected') {
+          navigate('/pending', { replace: true });
+        } else {
+          navigate('/seller/dashboard', { replace: true });
+        }
+      } else if (profile.role === 'admin') {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/', { replace: true }); // Fallback
+      }
+    }
+  }, [authState, user, profile, navigate, isAdminFlow, isAttemptingLogin]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
+    setIsAttemptingLogin(true);
 
     try {
       await loginUser(email, password);
-      const userData = await reloadProfile();
-
-      if (userData) {
-        
-        if (isAdminFlow && userData.role !== 'admin') {
-          await logoutUser();
-          setError('Admin access required.');
-          setIsLoading(false);
-          return;
-        }
-
-        toast.success(`Welcome back, ${userData.name?.split(' ')[0] || 'there'}! 👋`);
-
-        if (userData.role === 'customer') {
-          navigate('/', { replace: true });
-        } else if (userData.role === 'artisan') {
-          if (!userData.hasOnboarded) {
-            navigate('/seller/onboarding', { replace: true });
-          } else if (userData.status === 'pending' || userData.status === 'rejected') {
-            navigate('/pending', { replace: true });
-          } else {
-            navigate('/seller/dashboard', { replace: true });
-          }
-        } else if (userData.role === 'admin') {
-          navigate('/admin', { replace: true });
-        } else {
-          navigate('/', { replace: true }); // Fallback
-        }
-      } else {
-         if (isAdminFlow) {
-           await signOut(auth);
-           setError('Admin access required.');
-           setIsLoading(false);
-           return;
-         }
-         toast.success(`Welcome back! 👋`);
-         navigate('/', { replace: true });
-      }
+      // Navigation is handled by the useEffect once AuthContext reaches 'ready' state
     } catch (err) {
       console.error(err);
       let message = 'Login failed. Please try again.';
@@ -94,8 +92,8 @@ const Login = () => {
         message = 'Invalid email or password.';
       }
       setError(message);
-    } finally {
       setIsLoading(false);
+      setIsAttemptingLogin(false);
     }
   };
 

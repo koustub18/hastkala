@@ -153,64 +153,47 @@ router.post('/enhance', imageLimiter, (req, res) => {
         return res.status(400).json({ success: false, error: 'Image file is required.' });
       }
 
-      const apiKey = process.env.PHOTOROOM_API_KEY;
-      if (!apiKey) {
-        return res.status(501).json({ success: false, error: 'AI Enhancement provider credentials not configured.' });
-      }
+      const { execFile } = require('child_process');
+      const fs = require('fs');
+      const path = require('path');
+      const os = require('os');
+      const crypto = require('crypto');
 
-      // Convert buffer to Blob for Node 18+ fetch FormData
-      const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
-      const formData = new FormData();
-      formData.append('imageFile', blob, req.file.originalname || 'image.jpg');
+      const tempDir = os.tmpdir();
+      const id = crypto.randomBytes(16).toString('hex');
+      const inputPath = path.join(tempDir, `input_${id}.jpg`);
+      const outputPath = path.join(tempDir, `output_${id}.jpg`);
 
-      // Make request to Photoroom API
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      // Write the uploaded buffer to a temp file
+      fs.writeFileSync(inputPath, req.file.buffer);
 
-      let response;
-      try {
-        response = await fetch("https://image-api.photoroom.com/v2/edit", {
-          method: "POST",
-          headers: {
-            "x-api-key": apiKey,
-            "pr-ai-upscale-model-version": "ai-upscale-2025-07-29",
-            "pr-hd-background-removal": "auto",
-            "pr-ai-shadows-model-version": "default"
-          },
-          body: formData,
-          signal: controller.signal
-        });
-      } catch (e) {
-        clearTimeout(timeout);
-        if (e.name === 'AbortError') {
-          return res.status(504).json({ success: false, error: 'AI provider request timed out.' });
+      const pythonExec = path.join(__dirname, '..', 'venv', 'bin', 'python3');
+      const scriptPath = path.join(__dirname, '..', 'image_pipeline', 'process.py');
+
+      execFile(pythonExec, [scriptPath, '--input', inputPath, '--output', outputPath], { timeout: 30000 }, (error, stdout, stderr) => {
+        try {
+          if (error) {
+            console.error('Python Processing Error:', stderr || error.message);
+            return res.status(500).json({ success: false, error: 'Failed to improve the photo. Please try again.' });
+          }
+
+          if (fs.existsSync(outputPath)) {
+            const outputBuffer = fs.readFileSync(outputPath);
+            res.status(200).json({
+              success: true,
+              base64Image: outputBuffer.toString('base64'),
+              mimeType: 'image/jpeg'
+            });
+          } else {
+            console.error('Python Processing Error: Output file not found');
+            res.status(500).json({ success: false, error: 'Failed to improve the photo.' });
+          }
+        } finally {
+          // Cleanup temp files
+          if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+          if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
         }
-        throw e;
-      }
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        if (response.status === 429) {
-          return res.status(429).json({ success: false, error: 'AI provider rate limit exceeded.' });
-        }
-        return res.status(502).json({ success: false, error: 'AI provider returned an error: ' + response.statusText });
-      }
-
-      const arrayBuffer = await response.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const contentType = response.headers.get('content-type') || 'image/png';
-
-      // Ensure we actually got an image back
-      if (!contentType.startsWith('image/')) {
-         return res.status(502).json({ success: false, error: 'AI provider returned invalid data type.' });
-      }
-
-      res.status(200).json({
-        success: true,
-        base64Image: buffer.toString('base64'),
-        mimeType: contentType
       });
-
     } catch (error) {
       console.error('AI Enhancement Error:', error);
       res.status(500).json({ success: false, error: 'Internal Server Error' });

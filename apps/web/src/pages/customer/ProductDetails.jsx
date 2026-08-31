@@ -32,7 +32,9 @@ const ProductDetails = () => {
     );
   }
 
-  const images = [product.image, product.image2].filter(Boolean).map(resolveImageUrl);
+  const images = (product.images?.length > 0 
+    ? product.images 
+    : [product.image, product.image2].filter(Boolean)).map(resolveImageUrl);
   if (images.length === 0) images.push(''); // placeholder
 
   const handleEnquirySubmit = async (e) => {
@@ -112,7 +114,7 @@ const ProductDetails = () => {
             {/* Product Info */}
             <div className="p-8 md:p-12 flex flex-col justify-center">
               <div className="mb-4 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-terracotta-50 text-terracotta-700 text-xs font-bold uppercase tracking-widest">
-                <Tag size={14} /> {product.category || 'Handcrafted'}
+                <Tag size={14} /> {product.craft || product.category || 'Handcrafted'}
               </div>
               <h1 className="text-4xl md:text-5xl font-bold text-earth-900 font-serif mb-6 leading-tight">{product.title}</h1>
               

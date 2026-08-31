@@ -2,6 +2,7 @@ import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'fire
 import { db } from '../utils/firebase';
 import { getSafeMillis } from '../utils/dateUtils';
 import { Enquiry, CreateEnquiryInput } from '../types/enquiry';
+import { createNotification } from './notificationService';
 
 export const createEnquiry = async (data: CreateEnquiryInput): Promise<string> => {
   const { productId, productTitle, artisanId, customerName, customerEmail, message } = data;
@@ -19,6 +20,15 @@ export const createEnquiry = async (data: CreateEnquiryInput): Promise<string> =
     message,
     status: 'new',
     createdAt: serverTimestamp()
+  });
+
+  // Trigger real-time notification for the artisan
+  await createNotification({
+    userId: artisanId,
+    type: 'enquiry_received',
+    title: `New Enquiry from ${customerName}`,
+    message: `You have a new message regarding "${productTitle}".`,
+    relatedProductId: productId
   });
 
   return docRef.id;

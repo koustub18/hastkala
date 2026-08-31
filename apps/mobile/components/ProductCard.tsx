@@ -11,7 +11,8 @@ export default function ProductCard({ product }: Props) {
   const router = useRouter();
 
   // Determine a valid image source or use a fallback
-  const imageSource = product.image ? { uri: product.image } : require('../../assets/images/favicon.png');
+  const imgUri = product.image || ((product as any).images && (product as any).images.length > 0 ? (product as any).images[0] : null);
+  const imageSource = imgUri ? { uri: imgUri } : require('../../assets/images/favicon.png');
 
   return (
     <TouchableOpacity 

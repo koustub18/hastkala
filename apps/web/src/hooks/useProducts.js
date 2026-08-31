@@ -9,31 +9,9 @@ export const useProducts = (maxCount = null, artisanId = null) => {
     const fetchProducts = async () => {
       try {
         const productsList = await getProducts({ artisanId, limit: maxCount });
-        
-        if (productsList.length === 0) {
-          const { products: localProducts } = await import('../data/products');
-          let local = [...localProducts];
-          if (artisanId) {
-            local = local.filter(p => String(p.artisanId) === String(artisanId));
-          }
-          if (maxCount) {
-            local = local.slice(0, maxCount);
-          }
-          setProducts(local);
-        } else {
-          setProducts(productsList);
-        }
+        setProducts(productsList || []);
       } catch (err) {
-        console.error("Error fetching products:", err);
-        const { products: localProducts } = await import('../data/products');
-        let local = [...localProducts];
-        if (artisanId) {
-          local = local.filter(p => String(p.artisanId) === String(artisanId));
-        }
-        if (maxCount) {
-          local = local.slice(0, maxCount);
-        }
-        setProducts(local);
+        setProducts([]);
       } finally {
         setIsLoading(false);
       }

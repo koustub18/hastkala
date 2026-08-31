@@ -193,8 +193,32 @@ const AdminApplications = () => {
                       </div>
                     </div>
                   </div>
+                  
+                  {artisan.verification?.documents && (
+                    <div className="mt-6 border-t border-earth-100 pt-6">
+                      <h4 className="text-xs font-bold text-earth-400 uppercase tracking-wider mb-3">Verification Documents</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {artisan.verification.documents.identity && (
+                          <div className="bg-white p-3 rounded border border-earth-200">
+                            <span className="text-xs text-earth-500 block mb-2 font-bold">Government ID</span>
+                            <a href={artisan.verification.documents.identity} target="_blank" rel="noopener noreferrer">
+                              <img src={artisan.verification.documents.identity} alt="Gov ID" className="w-full h-32 object-cover rounded border border-earth-100 hover:opacity-80 transition-opacity" />
+                            </a>
+                          </div>
+                        )}
+                        {artisan.verification.documents.profilePhoto && (
+                          <div className="bg-white p-3 rounded border border-earth-200">
+                            <span className="text-xs text-earth-500 block mb-2 font-bold">Profile Photo</span>
+                            <a href={artisan.verification.documents.profilePhoto} target="_blank" rel="noopener noreferrer">
+                              <img src={artisan.verification.documents.profilePhoto} alt="Profile" className="w-full h-32 object-cover rounded border border-earth-100 hover:opacity-80 transition-opacity" />
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-                  <div className="flex gap-3 justify-end pt-4 border-t border-earth-200">
+                  <div className="flex gap-3 justify-end pt-4 border-t border-earth-200 mt-6">
                     {activeTab === 'pending' && (
                       <>
                         <button

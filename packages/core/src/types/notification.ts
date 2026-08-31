@@ -7,6 +7,7 @@ export type NotificationType =
   | 'image_enhanced_failed'
   | 'pricing_success'
   | 'pricing_failed'
+  | 'enquiry_received'
   | 'general';
 
 export interface Notification {

@@ -1,25 +1,28 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useMemo } from 'react';
+import { View, Text, TextInput, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView } from 'react-native';
 import { getProducts, Product } from '@hastkala/core';
 import ProductCard from '../../components/ProductCard';
 
-const CATEGORIES = ['All', 'Textiles', 'Pottery', 'Decor', 'Paintings', 'Metalwork', 'Jewellery', 'Wood Carving'];
+const SORT_OPTIONS = ['Newest', 'Price: Low to High', 'Price: High to Low'];
 
 export default function ExploreScreen() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedMaterial, setSelectedMaterial] = useState('All');
+  const [sortBy, setSortBy] = useState('Newest');
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     fetchProducts();
-  }, [selectedCategory]);
+  }, []);
 
   const fetchProducts = async () => {
     setLoading(true);
     try {
       const result = await getProducts({
-        limit: 20
+        limit: 50
       });
       setProducts(result || []);
     } catch (error) {
@@ -29,19 +32,49 @@ export default function ExploreScreen() {
     }
   };
 
-  const filteredProducts = products.filter(p => {
-    const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          (p.artisanName && p.artisanName.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  const categories = useMemo(() => {
+    const cats = new Set(products.map(p => p.category).filter(c => !!c) as string[]);
+    return ['All', ...Array.from(cats).sort()];
+  }, [products]);
 
-  const renderCategory = ({ item }: { item: string }) => (
+  const materials = useMemo(() => {
+    const mats = new Set(products.map(p => p.material).filter(m => !!m) as string[]);
+    return ['All', ...Array.from(mats).sort()];
+  }, [products]);
+
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+      const searchLower = searchQuery.toLowerCase().trim();
+      const titleMatch = p.title?.toLowerCase().includes(searchLower);
+      const artisanMatch = p.artisanName?.toLowerCase().includes(searchLower) || p.artisanId?.toLowerCase().includes(searchLower);
+      const categoryMatchSearch = p.category?.toLowerCase().includes(searchLower);
+      const materialMatchSearch = p.material?.toLowerCase().includes(searchLower);
+      
+      const matchesSearch = !searchLower || titleMatch || artisanMatch || categoryMatchSearch || materialMatchSearch;
+      const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
+      const matchesMaterial = selectedMaterial === 'All' || p.material === selectedMaterial;
+      
+      return matchesSearch && matchesCategory && matchesMaterial;
+    }).sort((a, b) => {
+      const priceA = Number(a.price) || 0;
+      const priceB = Number(b.price) || 0;
+      
+      if (sortBy === 'Price: Low to High') return priceA - priceB;
+      if (sortBy === 'Price: High to Low') return priceB - priceA;
+      
+      // Default: Newest
+      const dateA = (a.createdAt as any)?.toMillis?.() || new Date((a.createdAt || 0) as string | number).getTime();
+      const dateB = (b.createdAt as any)?.toMillis?.() || new Date((b.createdAt || 0) as string | number).getTime();
+      return dateB - dateA;
+    });
+  }, [products, searchQuery, selectedCategory, selectedMaterial, sortBy]);
+
+  const renderPill = (item: string, selected: string, onSelect: (val: string) => void) => (
     <TouchableOpacity 
-      style={[styles.categoryPill, selectedCategory === item && styles.categoryPillActive]}
-      onPress={() => setSelectedCategory(item)}
+      style={[styles.categoryPill, selected === item && styles.categoryPillActive]}
+      onPress={() => onSelect(item)}
     >
-      <Text style={[styles.categoryText, selectedCategory === item && styles.categoryTextActive]}>
+      <Text style={[styles.categoryText, selected === item && styles.categoryTextActive]}>
         {item}
       </Text>
     </TouchableOpacity>
@@ -53,21 +86,50 @@ export default function ExploreScreen() {
         <Text style={styles.title}>Explore Marketplace</Text>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search products or artisans..."
+          placeholder="Search products, materials, artisans..."
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
         
         <View style={styles.categoriesContainer}>
           <FlatList
-            data={CATEGORIES}
+            data={categories.length > 1 ? categories : ['All', 'Textiles', 'Pottery', 'Decor', 'Paintings']}
             horizontal
             showsHorizontalScrollIndicator={false}
-            renderItem={renderCategory}
+            renderItem={({item}) => renderPill(item, selectedCategory, setSelectedCategory)}
             keyExtractor={item => item}
             contentContainerStyle={styles.categoriesList}
           />
         </View>
+
+        <TouchableOpacity 
+          style={styles.filterToggleBtn} 
+          onPress={() => setShowFilters(!showFilters)}
+        >
+          <Text style={styles.filterToggleText}>{showFilters ? 'Hide Filters' : 'Show Advanced Filters'}</Text>
+        </TouchableOpacity>
+
+        {showFilters && (
+          <View style={styles.expandedFilters}>
+            <Text style={styles.filterLabel}>Material</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList} style={{marginBottom: 10, maxHeight: 40}}>
+              {materials.map(item => (
+                <React.Fragment key={`mat-${item}`}>
+                  {renderPill(item, selectedMaterial, setSelectedMaterial)}
+                </React.Fragment>
+              ))}
+            </ScrollView>
+
+            <Text style={styles.filterLabel}>Sort By</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList} style={{maxHeight: 40}}>
+              {SORT_OPTIONS.map(item => (
+                <React.Fragment key={`sort-${item}`}>
+                  {renderPill(item, sortBy, setSortBy)}
+                </React.Fragment>
+              ))}
+            </ScrollView>
+          </View>
+        )}
       </View>
 
       {loading ? (
@@ -77,12 +139,20 @@ export default function ExploreScreen() {
       ) : filteredProducts.length === 0 ? (
         <View style={styles.centerContainer}>
           <Text style={styles.emptyText}>No products found matching your search.</Text>
+          <TouchableOpacity style={styles.clearBtn} onPress={() => {
+            setSearchQuery('');
+            setSelectedCategory('All');
+            setSelectedMaterial('All');
+            setSortBy('Newest');
+          }}>
+            <Text style={styles.clearBtnText}>Clear Filters</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
           data={filteredProducts}
           renderItem={({ item }) => <ProductCard product={item} />}
-          keyExtractor={(item) => (item.id || item._id) as string}
+          keyExtractor={(item, index) => (item.id || item._id || index.toString()) as string}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
         />
@@ -120,6 +190,7 @@ const styles = StyleSheet.create({
   },
   categoriesContainer: {
     height: 40,
+    marginBottom: 8,
   },
   categoriesList: {
     gap: 8,
@@ -145,6 +216,29 @@ const styles = StyleSheet.create({
   categoryTextActive: {
     color: '#FFFFFF',
   },
+  filterToggleBtn: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  filterToggleText: {
+    color: '#8B4513',
+    fontWeight: 'bold',
+    fontSize: 12,
+    textTransform: 'uppercase',
+  },
+  expandedFilters: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  filterLabel: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#666',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
   listContent: {
     padding: 20,
   },
@@ -158,5 +252,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
+    marginBottom: 16,
   },
+  clearBtn: {
+    backgroundColor: '#8B4513',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  clearBtnText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+  }
 });

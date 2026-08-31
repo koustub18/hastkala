@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, Check, Package, Sparkles, Image as ImageIcon, IndianRupee, Info, X } from 'lucide-react';
+import { Bell, Check, Package, Sparkles, Image as ImageIcon, IndianRupee, Info, X, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNotifications } from '../hooks/useNotifications';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,6 +20,8 @@ const getNotificationIcon = (type) => {
     case 'pricing_success':
     case 'pricing_failed':
       return <IndianRupee size={16} className="text-green-500" />;
+    case 'enquiry_received':
+      return <Mail size={16} className="text-earth-600" />;
     default:
       return <Info size={16} className="text-earth-500" />;
   }

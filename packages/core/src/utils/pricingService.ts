@@ -1,32 +1,11 @@
 import { PricingRequest, PricingResponse } from '../types/pricing';
 
 export const getMarketPricingContext = async (productData: Partial<PricingRequest>): Promise<Record<string, any>> => {
-  // TODO: Integrate with real market data APIs or datasets.
-  // Currently returning internal DEMO DATA for Hackathon demonstration.
-  console.log("Fetching market pricing context for:", productData.category);
-  
-  // Fake network delay
-  await new Promise(resolve => setTimeout(resolve, 800));
-
-  // DEMO DATA based on category
-  const mockMarketData: Record<string, { avg: number; demand: string; trend: string }> = {
-    'Textiles': { avg: 1200, demand: 'High', trend: 'Upward' },
-    'Pottery': { avg: 800, demand: 'Medium', trend: 'Stable' },
-    'Decor': { avg: 1500, demand: 'High', trend: 'Upward' },
-    'Paintings': { avg: 2500, demand: 'Low', trend: 'Stable' },
-    'Metalwork': { avg: 1800, demand: 'Medium', trend: 'Upward' },
-    'Jewellery': { avg: 2200, demand: 'High', trend: 'Upward' },
-    'Wood Carving': { avg: 1100, demand: 'Medium', trend: 'Stable' },
-  };
-
-  const marketInfo = mockMarketData[productData.category as string] || { avg: 1000, demand: 'Medium', trend: 'Stable' };
-
+  // In production, market pricing context is primarily driven by the AI engine backend.
+  // We return a neutral context here. If a dedicated market data API is added later, it can be integrated here.
   return {
-    averageMarketPrice: marketInfo.avg,
-    demandTrend: marketInfo.demand,
-    priceTrend: marketInfo.trend,
-    contextProvided: true,
-    source: "DEMO DATA"
+    contextProvided: false,
+    source: "Local Fallback"
   };
 };
 
@@ -65,8 +44,6 @@ export const generatePricingAnalysis = async (productData: Partial<PricingReques
 
     return data;
   } catch (error) {
-    console.error('Error generating AI pricing analysis:', error);
-    
     // Fallback if backend AI fails
     const baseCost = Number(productData.rawMaterialCost) || 0;
     const laborCost = Number(productData.laborCost) || 0;
@@ -81,11 +58,8 @@ export const generatePricingAnalysis = async (productData: Partial<PricingReques
       suggestedMin = Math.round(totalCost * 1.3);
       suggestedMax = Math.round(totalCost * 1.8);
       recommended = Math.round(totalCost * 1.5);
-    } else if (marketContext.contextProvided) {
-      recommended = marketContext.averageMarketPrice;
-      suggestedMin = Math.round(recommended * 0.8);
-      suggestedMax = Math.round(recommended * 1.2);
     } else {
+      // Default fallback when AI is down and no cost data is provided
       recommended = 500;
       suggestedMin = 400;
       suggestedMax = 600;

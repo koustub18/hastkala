@@ -47,23 +47,59 @@ const ArtisanOnboarding = () => {
 
   const finishOnboarding = async () => {
     setIsSaving(true);
+    setError('');
     try {
-      // Update the user document in Firestore
       const user = auth.currentUser;
-      if (user) {
-        await setDoc(doc(db, 'users', user.uid), {
-          phone: formData.phone,
-          location: formData.location,
-          specialty: formData.specialty,
-          upiId: formData.upi,
-          hasOnboarded: true
-        }, { merge: true });
+      if (!user) throw new Error("Not authenticated");
+
+      if (!formData.aadhaarFile || !formData.photoFile) {
+        throw new Error("Missing required documents. Please upload them.");
       }
+
+      const validateFile = (file, maxSizeMB = 5, types = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']) => {
+        if (!file || file.size === 0) throw new Error("Empty file detected.");
+        if (file.size > maxSizeMB * 1024 * 1024) throw new Error(`File ${file.name} is too large. Max ${maxSizeMB}MB.`);
+        if (!types.includes(file.type)) throw new Error(`File ${file.name} has invalid type. Supported: JPG, PNG, WEBP, PDF.`);
+      };
+
+      validateFile(formData.aadhaarFile);
+      validateFile(formData.photoFile, 5, ['image/jpeg', 'image/png', 'image/webp']);
+
+      const { storage } = await import('@hastkala/core');
+      const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+
+      const uploadDoc = async (file, type) => {
+        const ext = file.name.split('.').pop();
+        const docRef = ref(storage, `verifications/${user.uid}/${type}.${ext}`);
+        await uploadBytes(docRef, file);
+        return getDownloadURL(docRef);
+      };
+
+      const aadhaarUrl = await uploadDoc(formData.aadhaarFile, 'identity');
+      const photoUrl = await uploadDoc(formData.photoFile, 'profile');
+
+      await setDoc(doc(db, 'users', user.uid), {
+        phone: formData.phone,
+        location: formData.location,
+        specialty: formData.specialty,
+        upiId: formData.upi,
+        hasOnboarded: true,
+        verification: {
+          documents: {
+            identity: aadhaarUrl,
+            profilePhoto: photoUrl
+          },
+          status: 'pending',
+          submittedAt: serverTimestamp()
+        }
+      }, { merge: true });
+
+      navigate('/seller/dashboard', { replace: true });
     } catch (err) {
-      console.error('Failed to save profile', err);
+      console.error('Failed to save profile or upload documents:', err);
+      setError(err.message || 'Failed to complete onboarding. Please try again.');
     } finally {
       setIsSaving(false);
-      navigate('/seller/dashboard', { replace: true });
     }
   };
 

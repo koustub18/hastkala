@@ -95,7 +95,37 @@ const ArtisanDashboard = () => {
          </div>
        </header>
 
-       <div className="container mx-auto max-w-6xl px-6 lg:px-12 mt-[-40px] relative z-10">
+       <div className="container mx-auto max-w-6xl px-6 lg:px-12 mt-[-40px] relative z-10 mb-8">
+         {dashboardState.artisan.status === 'pending' && (
+           <div className="bg-yellow-100 border border-yellow-200 text-yellow-800 p-4 rounded-xl shadow-lg mb-6 flex items-center gap-3">
+             <ShieldAlert size={20} className="text-yellow-600" />
+             <div>
+               <h3 className="font-bold">Verification Pending</h3>
+               <p className="text-sm">Your application is under verification.</p>
+             </div>
+           </div>
+         )}
+         {dashboardState.artisan.status === 'active' && (
+           <div className="bg-forest-100 border border-forest-200 text-forest-800 p-4 rounded-xl shadow-lg mb-6 flex items-center gap-3">
+             <ShieldAlert size={20} className="text-forest-600" />
+             <div>
+               <h3 className="font-bold">Verified Artisan</h3>
+               <p className="text-sm">Your artisan account has been verified.</p>
+             </div>
+           </div>
+         )}
+         {dashboardState.artisan.status === 'rejected' && (
+           <div className="bg-red-100 border border-red-200 text-red-800 p-4 rounded-xl shadow-lg mb-6 flex items-center gap-3">
+             <ShieldAlert size={20} className="text-red-600" />
+             <div>
+               <h3 className="font-bold">Verification Rejected</h3>
+               <p className="text-sm">Your application needs changes. Reason: {dashboardState.artisan.verification?.rejectionReason || 'Please contact support.'}</p>
+             </div>
+           </div>
+         )}
+       </div>
+
+       <div className="container mx-auto max-w-6xl px-6 lg:px-12 relative z-10">
          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
            <EnquiriesCard totalEnquiries={dashboardState.enquiries?.length || 0} />
            <ImpressionsCard profileViews={dashboardState.artisan.metrics?.profileViews || 156} />

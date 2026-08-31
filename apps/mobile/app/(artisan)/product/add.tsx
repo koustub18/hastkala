@@ -201,7 +201,7 @@ export default function AddProductScreen() {
           ) : recording ? (
             <Text style={{ fontSize: 13, color: '#D32F2F', fontStyle: 'italic' }}>🔴 Recording...</Text>
           ) : transcriptionText ? (
-            <Text style={{ fontSize: 14, color: '#2F4F4F', leading: 20 }}>{transcriptionText}</Text>
+            <Text style={{ fontSize: 14, color: '#2F4F4F', lineHeight: 20 }}>{transcriptionText}</Text>
           ) : (
             <Text style={{ fontSize: 12, color: '#9E9E9E', fontStyle: 'italic' }}>Your voice transcription will appear here.</Text>
           )}

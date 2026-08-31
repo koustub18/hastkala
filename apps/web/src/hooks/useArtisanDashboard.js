@@ -107,7 +107,7 @@ const useArtisanDashboard = () => {
                   type: 'image/jpeg',
                   lastModified: Date.now(),
                 });
-                console.log(`Image compressed: ${(file.size / 1024).toFixed(0)}KB → ${(compressedFile.size / 1024).toFixed(0)}KB`);
+
                 resolve(compressedFile);
               } else {
                 resolve(file); // Fallback to original
@@ -126,7 +126,7 @@ const useArtisanDashboard = () => {
   };
 
   const uploadImage = async (file, field) => {
-    console.log(`uploadImage called for field ${field} with file:`, file);
+
 
     // ── Validate file type ──
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
@@ -151,11 +151,11 @@ const useArtisanDashboard = () => {
       const optimizedFile = await compressImage(file);
 
       const storageRef = ref(storage, `products/${userUid}/${Date.now()}_${file.name}`);
-      console.log("Uploading bytes to storageRef:", storageRef.fullPath);
+
       await uploadBytes(storageRef, optimizedFile);
-      console.log("Bytes uploaded, getting download URL...");
+
       const url = await getDownloadURL(storageRef);
-      console.log("Got download URL:", url);
+
       setNewProduct(p => ({ ...p, [field]: url }));
       toast.success('Image uploaded successfully');
     } catch (err) {

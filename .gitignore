@@ -2,3 +2,9 @@ node_modules/
 dist/
 .env
 *.log
+
+ai-service/model_cache/
+backend/venv/
+ai-service/.env
+backend/.env
+apps/web/.env

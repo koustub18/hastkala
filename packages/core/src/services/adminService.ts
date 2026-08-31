@@ -4,6 +4,7 @@ import { getSafeMillis } from '../utils/dateUtils';
 import { User } from '../types/user';
 import { Product } from '../types/product';
 import { Enquiry } from '../types/enquiry';
+import { createNotification } from './notificationService';
 
 export const getPendingArtisans = async (): Promise<User[]> => {
   const q = query(collection(db, 'users'), where('role', '==', 'artisan'));
@@ -33,6 +34,13 @@ export const approveArtisan = async (uid: string): Promise<void> => {
     'verification.status': 'approved',
     'verification.approvedAt': serverTimestamp(),
     'verification.reviewedBy': auth.currentUser?.uid || null
+  });
+
+  await createNotification({
+    userId: uid,
+    type: 'general',
+    title: 'Account Approved',
+    message: 'Your artisan account has been verified and approved. You can now list products on the marketplace.'
   });
 };
 

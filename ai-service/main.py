@@ -91,8 +91,9 @@ async def lifespan(app: FastAPI):
     hf_token = os.getenv("HF_TOKEN") or None
     try:
         from transformers import AutoModel
+        model_dir = "./model_cache" if os.path.exists("./model_cache") else MODEL_NAME
         model_instance = AutoModel.from_pretrained(
-            MODEL_NAME, 
+            model_dir, 
             trust_remote_code=True, 
             token=hf_token
         )

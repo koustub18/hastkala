@@ -12,16 +12,33 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null);
   const [authState, setAuthState] = useState('initializing'); // initializing, unauthenticated, profile_loading, ready
 
-  const fetchProfile = async (uid) => {
+  const fetchProfile = async (uid, retries = 3) => {
     try {
-      const userData = await getUserProfile(uid);
-      setProfile(userData || null);
-      return userData;
-    } catch (error) {
-      console.error("Error fetching user profile:", error);
-      setProfile(null);
-      return null;
+      if (auth.currentUser) {
+        await auth.currentUser.getIdToken(true);
+      }
+    } catch (e) {
+      console.warn("Failed to refresh ID token", e);
     }
+
+    let attempt = 0;
+    while (attempt < retries) {
+      try {
+        const userData = await getUserProfile(uid);
+        setProfile(userData || null);
+        return userData;
+      } catch (error) {
+        attempt++;
+        console.warn(`Error fetching user profile (attempt ${attempt}/${retries}):`, error);
+        if (attempt >= retries) {
+          console.error("Max retries reached. Profile fetch failed.");
+          setProfile(null);
+          return null;
+        }
+        await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+      }
+    }
+    return null;
   };
 
   useEffect(() => {
