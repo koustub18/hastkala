@@ -129,6 +129,9 @@ class AdaptiveLightingEnhancer:
         rgb_arr = np.array(input_image)
         bgr_arr = cv2.cvtColor(rgb_arr, cv2.COLOR_RGB2BGR)
 
+        # 1. White Balance (Gray-World White Balance to remove color casts)
+        bgr_arr = self._apply_white_balance(bgr_arr)
+
         # Convert to LAB color space
         lab = cv2.cvtColor(bgr_arr, cv2.COLOR_BGR2LAB)
         l_chan, a_chan, b_chan = cv2.split(lab)
@@ -137,23 +140,14 @@ class AdaptiveLightingEnhancer:
         stats = self._analyze_lighting(l_chan, a_chan, b_chan)
         logger.info(f"Lighting Analysis: {stats}")
 
-        # 1. White Balance (applied early on BGR IF significant color cast detected)
-        if stats["has_color_cast"]:
-            bgr_arr = self._apply_white_balance(bgr_arr)
-            lab = cv2.cvtColor(bgr_arr, cv2.COLOR_BGR2LAB)
-            l_chan, a_chan, b_chan = cv2.split(lab)
+        # 2. CLAHE Local Contrast Enhancement (Always applied for crisp details)
+        l_chan = self._apply_clahe(l_chan)
 
-        # 2. Gamma Correction (if image is dark or overexposed)
-        if stats["is_dark"] or stats["is_bright"]:
-            l_chan = self._apply_gamma_correction(l_chan, stats["mean_l"])
+        # 3. Adaptive Gamma Correction (Brings lightness near target 135)
+        l_chan = self._apply_gamma_correction(l_chan, stats["mean_l"])
 
-        # 3. CLAHE Local Contrast (if low contrast or uneven shadows)
-        if stats["is_low_contrast"] or stats["is_shadow_heavy"]:
-            l_chan = self._apply_clahe(l_chan)
-
-        # 4. Shadow Detail Lift (if shadows remain dark)
-        if stats["is_shadow_heavy"]:
-            l_chan = self._apply_shadow_adjustment(l_chan, stats["shadow_mean"])
+        # 4. Shadow Detail Lift (Boost dark shadow areas)
+        l_chan = self._apply_shadow_adjustment(l_chan, stats["shadow_mean"])
 
         # Recombine LAB channels
         enhanced_lab = cv2.merge([l_chan, a_chan, b_chan])
