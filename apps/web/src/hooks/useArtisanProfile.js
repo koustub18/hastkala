@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getArtisanProfile } from '@hastkala/core';
+import { getArtisanProfile, incrementArtisanImpressions } from '@hastkala/core';
 
 export const useArtisanProfile = (artisanId) => {
   const [artisan, setArtisan] = useState(null);
@@ -17,6 +17,8 @@ export const useArtisanProfile = (artisanId) => {
         
         if (fetchedArtisan) {
           setArtisan({ id: fetchedArtisan.uid, ...fetchedArtisan });
+          // Track profile view impression for this specific artisan
+          incrementArtisanImpressions(artisanId);
         } else {
           setArtisan(null);
         }

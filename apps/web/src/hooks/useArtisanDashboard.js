@@ -73,9 +73,16 @@ const useArtisanDashboard = () => {
   const COMPRESS_QUALITY = 0.8;
 
   const compressImage = (file) => {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
+      // 3-second safety timeout so compression never hangs indefinitely
+      const timeoutId = setTimeout(() => {
+        console.warn('Image compression timed out. Falling back to original file.');
+        resolve(file);
+      }, 3000);
+
       // Skip compression for small files (< 500KB)
       if (file.size < 500 * 1024) {
+        clearTimeout(timeoutId);
         resolve(file);
         return;
       }
@@ -85,48 +92,68 @@ const useArtisanDashboard = () => {
 
       reader.onload = (e) => {
         img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
+          try {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
 
-          // Scale down if wider than target
-          if (width > COMPRESS_TARGET_WIDTH) {
-            height = Math.round((height * COMPRESS_TARGET_WIDTH) / width);
-            width = COMPRESS_TARGET_WIDTH;
+            // Scale down if wider than target
+            if (width > COMPRESS_TARGET_WIDTH) {
+              height = Math.round((height * COMPRESS_TARGET_WIDTH) / width);
+              width = COMPRESS_TARGET_WIDTH;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            canvas.toBlob(
+              (blob) => {
+                clearTimeout(timeoutId);
+                if (blob) {
+                  const compressedFile = new File([blob], file.name, {
+                    type: 'image/jpeg',
+                    lastModified: Date.now(),
+                  });
+                  resolve(compressedFile);
+                } else {
+                  resolve(file); // Fallback to original
+                }
+              },
+              'image/jpeg',
+              COMPRESS_QUALITY
+            );
+          } catch (err) {
+            clearTimeout(timeoutId);
+            resolve(file);
           }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-
-          canvas.toBlob(
-            (blob) => {
-              if (blob) {
-                const compressedFile = new File([blob], file.name, {
-                  type: 'image/jpeg',
-                  lastModified: Date.now(),
-                });
-
-                resolve(compressedFile);
-              } else {
-                resolve(file); // Fallback to original
-              }
-            },
-            'image/jpeg',
-            COMPRESS_QUALITY
-          );
         };
-        img.onerror = () => resolve(file); // Fallback to original
+        img.onerror = () => {
+          clearTimeout(timeoutId);
+          resolve(file);
+        };
         img.src = e.target.result;
       };
-      reader.onerror = () => resolve(file); // Fallback to original
+      reader.onerror = () => {
+        clearTimeout(timeoutId);
+        resolve(file);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const readFileAsDataUrl = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = (e) => reject(e);
       reader.readAsDataURL(file);
     });
   };
 
   const uploadImage = async (file, field) => {
-
+    if (!file) return;
 
     // ── Validate file type ──
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
@@ -142,25 +169,37 @@ const useArtisanDashboard = () => {
 
     setImageUploading(prev => ({ ...prev, [field]: true }));
     try {
-      if (!userUid) {
-        console.error("userUid is missing!");
-        throw new Error("Not authenticated");
-      }
+      const effectiveUid = userUid || auth.currentUser?.uid || 'artisan_demo';
 
       // ── Compress before upload ──
       const optimizedFile = await compressImage(file);
 
-      const storageRef = ref(storage, `products/${userUid}/${Date.now()}_${file.name}`);
+      let downloadUrl = null;
 
-      await uploadBytes(storageRef, optimizedFile);
+      try {
+        const storageRef = ref(storage, `products/${effectiveUid}/${Date.now()}_${file.name}`);
+        const uploadPromise = uploadBytes(storageRef, optimizedFile).then(snapshot => getDownloadURL(snapshot.ref));
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Firebase upload timeout')), 8000)
+        );
 
-      const url = await getDownloadURL(storageRef);
+        downloadUrl = await Promise.race([uploadPromise, timeoutPromise]);
+      } catch (storageErr) {
+        console.warn('Cloud storage upload error or timeout, falling back to Data URL:', storageErr);
+        downloadUrl = await readFileAsDataUrl(optimizedFile);
+      }
 
-      setNewProduct(p => ({ ...p, [field]: url }));
-      toast.success('Image uploaded successfully');
+      setNewProduct(p => ({ ...p, [field]: downloadUrl }));
+      toast.success('Image ready');
     } catch (err) {
       console.error('Upload failed with error:', err);
-      toast.error('Could not upload image. Please try again.');
+      try {
+        const dataUrl = await readFileAsDataUrl(file);
+        setNewProduct(p => ({ ...p, [field]: dataUrl }));
+        toast.success('Image ready');
+      } catch (readErr) {
+        toast.error('Could not process image. Please try again.');
+      }
     } finally {
       setImageUploading(prev => ({ ...prev, [field]: false }));
     }

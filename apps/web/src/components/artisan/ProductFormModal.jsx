@@ -845,24 +845,24 @@ const ProductFormModal = ({
                                    setEnhancedImage(null); 
                                }} className="flex-1 py-3 border border-earth-300 text-earth-700 rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-earth-50 transition-colors">Keep Original</button>
                                <button type="button" onClick={() => { 
-                                   try {
-                                     if (enhancedImage.startsWith('data:')) {
-                                       const arr = enhancedImage.split(',');
-                                       const mime = arr[0].match(/:(.*?);/)[1];
-                                       const bstr = atob(arr[1]);
-                                       let n = bstr.length;
-                                       const u8arr = new Uint8Array(n);
-                                       while(n--){
-                                           u8arr[n] = bstr.charCodeAt(n);
-                                       }
-                                       const file = new File([u8arr], "enhanced_product.png", {type: mime});
-                                       uploadImage(file, 'image');
-                                     } else {
-                                       setNewProduct(p => ({ ...p, image: enhancedImage }));
-                                     }
-                                   } catch (e) {
-                                     console.error(e);
+                                   if (enhancedImage) {
                                      setNewProduct(p => ({ ...p, image: enhancedImage }));
+                                     if (enhancedImage.startsWith('data:')) {
+                                       try {
+                                         const arr = enhancedImage.split(',');
+                                         const mime = arr[0].match(/:(.*?);/)[1];
+                                         const bstr = atob(arr[1]);
+                                         let n = bstr.length;
+                                         const u8arr = new Uint8Array(n);
+                                         while(n--){
+                                             u8arr[n] = bstr.charCodeAt(n);
+                                         }
+                                         const file = new File([u8arr], "enhanced_product.png", {type: mime});
+                                         uploadImage(file, 'image');
+                                       } catch (e) {
+                                         console.error(e);
+                                       }
+                                     }
                                    }
                                    setOriginalImage(null); 
                                    setEnhancedImage(null); 

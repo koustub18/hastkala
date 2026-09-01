@@ -1,4 +1,4 @@
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { db } from '../utils/firebase';
 import { User } from '../types/user';
 
@@ -9,6 +9,18 @@ export const getArtisanProfile = async (uid: string): Promise<User | null> => {
     return { uid, ...docSnap.data() } as User;
   }
   return null;
+};
+
+export const incrementArtisanImpressions = async (uid: string): Promise<void> => {
+  if (!uid) return;
+  try {
+    const userRef = doc(db, 'users', uid);
+    await updateDoc(userRef, {
+      'metrics.profileViews': increment(1)
+    });
+  } catch (err) {
+    console.warn('Failed to increment artisan profile impressions:', err);
+  }
 };
 
 export const submitOnboarding = async (uid: string, data: Record<string, any>): Promise<void> => {

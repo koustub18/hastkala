@@ -128,7 +128,7 @@ const ArtisanDashboard = () => {
        <div className="container mx-auto max-w-6xl px-6 lg:px-12 relative z-10">
          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
            <EnquiriesCard totalEnquiries={dashboardState.enquiries?.length || 0} />
-           <ImpressionsCard profileViews={dashboardState.artisan.metrics?.profileViews || 156} />
+           <ImpressionsCard profileViews={dashboardState.artisan?.metrics?.profileViews ?? 0} />
            <ActiveListingsCard activeProducts={dashboardState.products?.length || 0} />
          </div>
 
