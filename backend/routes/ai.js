@@ -219,6 +219,39 @@ router.post('/deblur', imageLimiter, (req, res) => {
   });
 });
 
+router.post('/enhance-lighting', imageLimiter, (req, res) => {
+  uploadEnhance(req, res, async (err) => {
+    if (err) return res.status(400).json({ success: false, error: err.message });
+    try {
+      if (!req.file) return res.status(400).json({ success: false, error: 'Image file is required.' });
+
+      const aiServiceUrl = process.env.ASR_API_URL || 'http://localhost:8000';
+      const formData = new FormData();
+      const fileBlob = new Blob([req.file.buffer], { type: req.file.mimetype || 'image/jpeg' });
+      formData.append('file', fileBlob, req.file.originalname || 'image.jpg');
+
+      const response = await fetch(`${aiServiceUrl}/api/enhance-lighting`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error(`AI Service returned ${response.status}`);
+      const data = await response.json();
+      return res.status(200).json({
+        success: true,
+        image_url: data.image_url ? `${aiServiceUrl}${data.image_url}` : null,
+        base64Image: data.base64Image,
+        base64_image: data.base64_image,
+        mimeType: data.mimeType || 'image/png',
+        message: data.message || 'Image lighting enhanced using OpenCV LAB Adaptive Engine'
+      });
+    } catch (error) {
+      console.error('Lighting Enhancement Proxy Error:', error);
+      res.status(500).json({ success: false, error: "Failed to enhance image lighting." });
+    }
+  });
+});
+
 router.post('/remove-bg', imageLimiter, (req, res) => {
   uploadEnhance(req, res, async (err) => {
     if (err) return res.status(400).json({ success: false, error: err.message });

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { IndianRupee, Sparkles, CheckCircle2, ChevronRight, X, Loader2, Upload, ImageIcon, Mic, Wand2, Calculator, Info } from 'lucide-react';
+import { IndianRupee, Sparkles, CheckCircle2, ChevronRight, X, Loader2, Upload, ImageIcon, Mic, Wand2, Calculator, Info, Camera, RefreshCw, Sun, MapPin, Layers, Package } from 'lucide-react';
 import { getPriceSuggestion, createNotification } from '@hastkala/core';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -30,14 +30,25 @@ const ProductFormModal = ({
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
+  
+  // Multi-Stage Image Enhancement States
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isDeblurring, setIsDeblurring] = useState(false);
+  const [isLightingEnhancing, setIsLightingEnhancing] = useState(false);
   const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [deblurredImage, setDeblurredImage] = useState(null);
+  const [lightingImage, setLightingImage] = useState(null);
   const [enhancedImage, setEnhancedImage] = useState(null);
   const [originalImage, setOriginalImage] = useState(null);
   const [selectedImageFile, setSelectedImageFile] = useState(null);
   const [enhanceError, setEnhanceError] = useState('');
+
+  // Live Camera States & Refs
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [cameraFacingMode, setCameraFacingMode] = useState('environment'); // 'environment' (rear) or 'user' (front)
+  const videoRef = useRef(null);
+  const cameraStreamRef = useRef(null);
+
   const [isPricing, setIsPricing] = useState(false);
   const [pricingError, setPricingError] = useState('');
 
@@ -410,8 +421,135 @@ const ProductFormModal = ({
     }
   };
 
+  // Camera stream controls
+  const openCamera = async (overrideFacingMode = null) => {
+    const mode = overrideFacingMode || cameraFacingMode;
+    setIsCameraOpen(true);
+    setEnhanceError('');
+    try {
+      if (cameraStreamRef.current) {
+        cameraStreamRef.current.getTracks().forEach(t => t.stop());
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
+      cameraStreamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error('Camera access error:', err);
+      try {
+        const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        cameraStreamRef.current = fallbackStream;
+        if (videoRef.current) videoRef.current.srcObject = fallbackStream;
+      } catch (e) {
+        setEnhanceError('Unable to access camera on this device. Please check permissions.');
+        setIsCameraOpen(false);
+      }
+    }
+  };
+
+  const toggleCameraFacingMode = () => {
+    const newMode = cameraFacingMode === 'environment' ? 'user' : 'environment';
+    setCameraFacingMode(newMode);
+    openCamera(newMode);
+  };
+
+  const closeCamera = () => {
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach(t => t.stop());
+      cameraStreamRef.current = null;
+    }
+    setIsCameraOpen(false);
+  };
+
+  const captureCameraPhoto = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const file = new File([blob], 'artisan_photo.jpg', { type: 'image/jpeg' });
+        setSelectedImageFile(file);
+        const objectUrl = URL.createObjectURL(blob);
+        setOriginalImage(objectUrl);
+        setDeblurredImage(null);
+        setLightingImage(null);
+        setEnhancedImage(null);
+        closeCamera();
+      }
+    }, 'image/jpeg', 0.95);
+  };
+
+  const handleLightingEnhanceImage = async (overrideSrc = null) => {
+    const inputSrc = overrideSrc || deblurredImage || originalImage || newProduct.image;
+    if (!inputSrc && !selectedImageFile) return;
+    
+    setIsLightingEnhancing(true);
+    setEnhanceError('');
+    
+    if (!originalImage) {
+      setOriginalImage(selectedImageFile ? URL.createObjectURL(selectedImageFile) : newProduct.image);
+    }
+    
+    try {
+      const blob = await getImageBlob(inputSrc);
+      if (!blob) throw new Error("Could not read image data");
+
+      const formData = new FormData();
+      formData.append('file', blob, 'image.png');
+      formData.append('image_file', blob, 'image.png');
+
+      const asrBaseUrl = import.meta.env.VITE_ASR_API_URL || import.meta.env.NEXT_PUBLIC_ASR_API_URL || 'http://localhost:8000';
+      
+      let response;
+      try {
+        response = await fetch(`${asrBaseUrl}/api/enhance-lighting`, {
+          method: 'POST',
+          body: formData,
+        });
+      } catch (e) {
+        response = await fetch('/api/ai/enhance-lighting', {
+          method: 'POST',
+          body: formData,
+        });
+      }
+
+      if (!response.ok) throw new Error('Failed to enhance lighting');
+
+      const data = await response.json();
+      if (data.success) {
+        const lightingSrc = data.base64_image || (data.base64Image ? `data:${data.mimeType || 'image/png'};base64,${data.base64Image}` : (data.image_url ? (data.image_url.startsWith('http') ? data.image_url : `${asrBaseUrl}${data.image_url}`) : null));
+        if (!lightingSrc) throw new Error("Lighting enhancement failed to produce output");
+
+        setLightingImage(lightingSrc);
+        if (user?.uid) {
+          createNotification({
+            userId: user.uid,
+            type: 'lighting_enhanced_success',
+            title: 'Lighting Enhanced',
+            message: 'Image lighting and contrast enhanced using OpenCV LAB Adaptive Engine!'
+          });
+        }
+      } else {
+        throw new Error(data.error || "Lighting enhancement failed on server");
+      }
+    } catch (err) {
+      console.error('Lighting enhance error:', err);
+      setEnhanceError("Could not enhance lighting right now. Please try another photo.");
+    } finally {
+      setIsLightingEnhancing(false);
+    }
+  };
+
   const handleRemoveBgImage = async (overrideImageSrc = null) => {
-    const inputSrc = overrideImageSrc || deblurredImage || originalImage || newProduct.image;
+    const inputSrc = overrideImageSrc || lightingImage || deblurredImage || originalImage || newProduct.image;
     if (!inputSrc && !selectedImageFile) return;
     
     setIsRemovingBg(true);
@@ -727,6 +865,19 @@ const ProductFormModal = ({
                 </div>
               </div>
 
+              {/* Artisan Guidance Banner */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 text-xs">
+                <Info size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1 text-earth-800">
+                  <span className="font-bold text-amber-900 block text-xs uppercase tracking-wider">
+                    💡 Artisan Heritage Listing Tips
+                  </span>
+                  <p className="leading-relaxed">
+                    Please specify your <strong>Raw Materials</strong>, <strong>Craft Region / Origin Village</strong>, and <strong>Primary Crafting Materials</strong>. Sharing your authentic origin helps buyers connect with your traditional art!
+                  </p>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-earth-700 uppercase tracking-wider mb-2">Product Title *</label>
                 <input
@@ -739,7 +890,7 @@ const ProductFormModal = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-earth-700 uppercase tracking-wider mb-2">Category *</label>
                   <select
@@ -753,13 +904,23 @@ const ProductFormModal = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-earth-700 uppercase tracking-wider mb-2">Material</label>
+                  <label className="block text-xs font-bold text-earth-700 uppercase tracking-wider mb-2">Craft Region / Origin</label>
+                  <input
+                    type="text"
+                    value={newProduct.region || ''}
+                    onChange={e => setNewProduct(p => ({ ...p, region: e.target.value }))}
+                    className="w-full px-4 py-3 bg-earth-50 border border-earth-200 rounded-lg focus:outline-none focus:border-terracotta-500 focus:ring-1 focus:ring-terracotta-500"
+                    placeholder="e.g., Sambalpur, Odisha"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-earth-700 uppercase tracking-wider mb-2">Primary Materials</label>
                   <input
                     type="text"
                     value={newProduct.material}
                     onChange={e => setNewProduct(p => ({ ...p, material: e.target.value }))}
                     className="w-full px-4 py-3 bg-earth-50 border border-earth-200 rounded-lg focus:outline-none focus:border-terracotta-500 focus:ring-1 focus:ring-terracotta-500"
-                    placeholder="e.g., Cotton, Clay, Silk"
+                    placeholder="e.g., Natural Cotton, Terracotta Clay"
                   />
                 </div>
               </div>
@@ -926,28 +1087,84 @@ const ProductFormModal = ({
               <div>
                 <label className="block text-xs font-bold text-earth-700 uppercase tracking-wider mb-2">Main Product Photo *</label>
                 
+                {/* Live Camera Overlay Modal */}
+                {isCameraOpen && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+                    <div className="bg-earth-900 rounded-2xl p-4 max-w-md w-full flex flex-col items-center gap-4 shadow-2xl border border-earth-700">
+                      <div className="flex items-center justify-between w-full text-white">
+                        <span className="font-bold text-sm flex items-center gap-2">
+                          <Camera size={18} className="text-terracotta-400" /> Capture Product Photo
+                        </span>
+                        <button type="button" onClick={closeCamera} className="p-1 rounded-full hover:bg-earth-800 text-earth-400 hover:text-white">
+                          <X size={20} />
+                        </button>
+                      </div>
+
+                      <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-black border border-earth-800 flex items-center justify-center">
+                        <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                        <span className="absolute top-2 left-2 bg-black/60 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded backdrop-blur-sm">
+                          {cameraFacingMode === 'environment' ? 'Rear Camera 📷' : 'Front Camera 🤳'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-around w-full pt-2">
+                        <button
+                          type="button"
+                          onClick={toggleCameraFacingMode}
+                          className="px-4 py-2 bg-earth-800 hover:bg-earth-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors border border-earth-700"
+                        >
+                          <RefreshCw size={14} className="animate-spin-slow" /> Rotate Camera
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onClick={captureCameraPhoto}
+                          className="px-6 py-3 bg-terracotta-600 hover:bg-terracotta-500 text-white rounded-full font-bold text-sm flex items-center gap-2 shadow-lg transition-transform active:scale-95"
+                        >
+                          <Camera size={18} /> Take Photo
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={closeCamera}
+                          className="px-4 py-2 bg-earth-800 hover:bg-earth-700 text-earth-300 rounded-lg text-xs font-bold"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {originalImage ? (
                    <div className="bg-white p-4 rounded-xl border border-earth-200 shadow-sm space-y-4">
-                      {isDeblurring || isRemovingBg || isEnhancing ? (
+                      {isDeblurring || isLightingEnhancing || isRemovingBg || isEnhancing ? (
                          <div className="flex flex-col items-center justify-center py-8 text-center space-y-3">
                             <Loader2 size={36} className="text-terracotta-600 animate-spin" />
                             <div>
                                <p className="text-earth-900 font-bold text-base flex items-center justify-center gap-1.5">
                                   <Sparkles size={18} className="text-terracotta-500 animate-pulse" />
-                                  {isDeblurring ? "🔍 NAFNet is deblurring your image..." : isRemovingBg ? "✨ Removing background & adding white studio background..." : "⚡ Running Full AI Pipeline (Deblur + Remove BG)..."}
+                                  {isDeblurring 
+                                    ? "🔍 Stage 1: NAFNet deblurring..." 
+                                    : isLightingEnhancing 
+                                    ? "☀️ Stage 2: OpenCV LAB lighting & contrast enhancement..." 
+                                    : isRemovingBg 
+                                    ? "✨ Stage 3: Background removal with white studio canvas..." 
+                                    : "⚡ Running Full 3-Stage AI Pipeline (Deblur + Lighting + White BG)..."}
                                </p>
-                               <p className="text-xs text-earth-600 mt-1 font-medium">Processing locally with AI models</p>
-                               <p className="text-[11px] text-earth-400">Restoring quality & background</p>
+                               <p className="text-xs text-earth-600 mt-1 font-medium">Processing locally with AI & OpenCV</p>
+                               <p className="text-[11px] text-earth-400">Restoring quality, lighting & background</p>
                             </div>
                          </div>
                       ) : enhanceError ? (
                          <div className="flex flex-col items-center justify-center py-6 text-center">
                             <div className="text-red-500 font-bold text-sm mb-3">{enhanceError}</div>
-                            <img src={deblurredImage || originalImage} alt="Product Photo" className="w-32 h-32 object-contain rounded-lg border border-earth-200 mb-4 bg-earth-50" />
+                            <img src={enhancedImage || lightingImage || deblurredImage || originalImage} alt="Product Photo" className="w-32 h-32 object-contain rounded-lg border border-earth-200 mb-4 bg-earth-50" />
                             <button type="button" onClick={() => { 
                                if (selectedImageFile) uploadImage(selectedImageFile, 'image');
                                setOriginalImage(null); 
                                setDeblurredImage(null);
+                               setLightingImage(null);
                                setEnhancedImage(null);
                                setEnhanceError(''); 
                             }} className="px-6 py-2.5 bg-earth-900 text-white rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-earth-800">Keep Original</button>
@@ -956,10 +1173,10 @@ const ProductFormModal = ({
                          <div className="flex flex-col items-center">
                             <div className="flex items-center justify-between w-full mb-3">
                                <h3 className="font-serif font-bold text-earth-900 text-sm flex items-center gap-2">
-                                  <Sparkles size={16} className="text-terracotta-600" /> AI Image Studio
+                                  <Sparkles size={16} className="text-terracotta-600" /> AI Image Studio (3-Stage)
                                </h3>
                                <span className="text-[11px] font-bold text-terracotta-700 bg-terracotta-50 px-2.5 py-0.5 rounded-full border border-terracotta-200">
-                                  {enhancedImage ? "Final: White Background ✓" : deblurredImage ? "Step 1: Deblurred ✓" : "Original Image"}
+                                  {enhancedImage ? "Stage 3: White Background ✓" : lightingImage ? "Stage 2: Lighting Fixed ✓" : deblurredImage ? "Stage 1: Deblurred ✓" : "Original Photo"}
                                </span>
                             </div>
 
@@ -967,48 +1184,61 @@ const ProductFormModal = ({
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 w-full">
                                <div className="bg-earth-50 p-2 rounded-xl border border-earth-200 flex flex-col items-center">
                                   <span className="text-[10px] font-bold text-earth-500 uppercase tracking-wider mb-1">
-                                     {deblurredImage ? "Original Blurry" : "Original"}
+                                     Original Photo
                                   </span>
-                                  <img src={originalImage} alt="Original" className="w-full h-32 object-contain rounded-lg bg-white" />
+                                  <img src={originalImage} alt="Original" className="w-full h-36 object-contain rounded-lg bg-white" />
                                </div>
 
                                {enhancedImage ? (
                                   <div className="bg-green-50/60 p-2 rounded-xl border-2 border-green-500 shadow-sm flex flex-col items-center">
-                                     <span className="text-[10px] font-bold text-green-700 uppercase tracking-wider mb-1">Clean White Background</span>
-                                     <img src={enhancedImage} alt="Enhanced" className="w-full h-32 object-contain rounded-lg bg-white" />
+                                     <span className="text-[10px] font-bold text-green-700 uppercase tracking-wider mb-1">Final: Clean White Studio BG</span>
+                                     <img src={enhancedImage} alt="Enhanced" className="w-full h-36 object-contain rounded-lg bg-white" />
+                                  </div>
+                               ) : lightingImage ? (
+                                  <div className="bg-amber-50/60 p-2 rounded-xl border-2 border-amber-500 shadow-sm flex flex-col items-center">
+                                     <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1">Lighting Fixed (OpenCV LAB)</span>
+                                     <img src={lightingImage} alt="Lighting Enhanced" className="w-full h-36 object-contain rounded-lg bg-white" />
                                   </div>
                                ) : deblurredImage ? (
                                   <div className="bg-blue-50/60 p-2 rounded-xl border-2 border-blue-500 shadow-sm flex flex-col items-center">
                                      <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1">Deblurred (NAFNet)</span>
-                                     <img src={deblurredImage} alt="Deblurred" className="w-full h-32 object-contain rounded-lg bg-white" />
+                                     <img src={deblurredImage} alt="Deblurred" className="w-full h-36 object-contain rounded-lg bg-white" />
                                   </div>
                                ) : (
                                   <div className="bg-earth-50/50 p-2 rounded-xl border border-dashed border-earth-300 flex flex-col items-center justify-center text-center">
                                      <Sparkles size={24} className="text-earth-400 mb-1" />
                                      <p className="text-xs font-semibold text-earth-600">AI Enhancement Ready</p>
-                                     <p className="text-[10px] text-earth-400">Click below to Debblur or Remove BG</p>
+                                     <p className="text-[10px] text-earth-400">Click below to Debblur, Fix Lighting, or Remove BG</p>
                                   </div>
                                )}
                             </div>
 
                             {/* Step-by-Step AI Control Buttons */}
                             <div className="flex flex-col gap-2 w-full mb-3">
-                               <div className="flex gap-2 w-full">
+                               <div className="grid grid-cols-3 gap-2 w-full">
                                   <button
                                      type="button"
                                      onClick={handleDeblurImage}
                                      disabled={isDeblurring}
-                                     className="flex-1 py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                                     className="py-2.5 px-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-[11px] flex items-center justify-center gap-1 transition-colors shadow-sm"
                                   >
-                                     🔍 1. Debblur (NAFNet)
+                                     🔍 1. Deblur
                                   </button>
                                   <button
                                      type="button"
-                                     onClick={() => handleRemoveBgImage(deblurredImage || originalImage)}
-                                     disabled={isRemovingBg}
-                                     className="flex-1 py-2.5 px-3 bg-terracotta-600 hover:bg-terracotta-700 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                                     onClick={() => handleLightingEnhanceImage(deblurredImage || originalImage)}
+                                     disabled={isLightingEnhancing}
+                                     className="py-2.5 px-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-[11px] flex items-center justify-center gap-1 transition-colors shadow-sm"
                                   >
-                                     ✨ 2. Remove BG (White BG)
+                                     ☀️ 2. Fix Lighting
+                                  </button>
+                                  <button
+                                     type="button"
+                                     onClick={() => handleRemoveBgImage(lightingImage || deblurredImage || originalImage)}
+                                     disabled={isRemovingBg}
+                                     className="py-2.5 px-2 bg-terracotta-600 hover:bg-terracotta-700 text-white rounded-lg font-bold text-[11px] flex items-center justify-center gap-1 transition-colors shadow-sm"
+                                  >
+                                     ✨ 3. Remove BG
                                   </button>
                                </div>
 
@@ -1018,7 +1248,7 @@ const ProductFormModal = ({
                                   disabled={isEnhancing}
                                   className="w-full py-2.5 bg-earth-900 hover:bg-earth-800 text-white rounded-lg font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-md"
                                >
-                                  ⚡ Full Pipeline: Debblur + White BG
+                                  ⚡ Full 3-Stage Pipeline: Deblur + Lighting + White BG
                                </button>
                             </div>
 
@@ -1030,6 +1260,7 @@ const ProductFormModal = ({
                                      if (selectedImageFile) uploadImage(selectedImageFile, 'image');
                                      setOriginalImage(null); 
                                      setDeblurredImage(null);
+                                     setLightingImage(null);
                                      setEnhancedImage(null);
                                   }} 
                                   className="flex-1 py-2.5 border border-earth-300 text-earth-700 rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-earth-50 transition-colors"
@@ -1039,7 +1270,7 @@ const ProductFormModal = ({
                                <button 
                                   type="button" 
                                   onClick={() => { 
-                                     const bestImage = enhancedImage || deblurredImage;
+                                     const bestImage = enhancedImage || lightingImage || deblurredImage;
                                      if (bestImage) {
                                        setNewProduct(p => ({ ...p, image: bestImage }));
                                        if (bestImage.startsWith('data:')) {
@@ -1061,11 +1292,12 @@ const ProductFormModal = ({
                                      }
                                      setOriginalImage(null); 
                                      setDeblurredImage(null);
+                                     setLightingImage(null);
                                      setEnhancedImage(null); 
                                   }} 
                                   className="flex-1 py-2.5 bg-green-600 text-white rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-green-700 shadow-md transition-colors flex items-center justify-center gap-1.5"
                                >
-                                  <CheckCircle2 size={16} /> Apply {enhancedImage ? "White BG" : deblurredImage ? "Deblurred" : "Photo"}
+                                  <CheckCircle2 size={16} /> Apply {enhancedImage ? "White BG" : lightingImage ? "Lighting" : deblurredImage ? "Deblurred" : "Photo"}
                                </button>
                             </div>
                          </div>
@@ -1074,8 +1306,8 @@ const ProductFormModal = ({
 
                 ) : (
                   <div className="flex flex-col gap-3">
-                    <div className="flex gap-3 items-center">
-                      <label htmlFor="main-image-upload" className="flex-1 cursor-pointer">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                      <label htmlFor="main-image-upload" className="cursor-pointer">
                         <input
                           id="main-image-upload"
                           type="file"
@@ -1089,37 +1321,34 @@ const ProductFormModal = ({
                             }
                           }}
                         />
-                        <div className={`flex items-center justify-center gap-3 px-4 py-3 border-2 border-dashed rounded-lg transition-colors ${
+                        <div className={`flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed rounded-lg transition-colors ${
                           newProduct.image 
                             ? 'border-green-300 bg-green-50/50' 
                             : 'border-earth-300 bg-earth-50 hover:border-terracotta-400 hover:bg-terracotta-50/30'
                         }`}>
                           {imageUploading.image ? (
-                            <><Loader2 size={18} className="text-terracotta-500 animate-spin" /><span className="text-sm text-terracotta-600 font-medium">Uploading...</span></>
+                            <><Loader2 size={18} className="text-terracotta-500 animate-spin" /><span className="text-xs text-terracotta-600 font-medium">Uploading...</span></>
                           ) : newProduct.image ? (
-                            <><CheckCircle2 size={18} className="text-green-600" /><span className="text-sm text-green-700 font-medium">Photo uploaded — tap to change</span></>
+                            <><CheckCircle2 size={18} className="text-green-600" /><span className="text-xs text-green-700 font-medium">Gallery Photo Uploaded</span></>
                           ) : (
-                            <><Upload size={18} className="text-earth-500" /><span className="text-sm text-earth-600 font-medium">Tap to pick from Gallery</span></>
+                            <><Upload size={18} className="text-earth-500" /><span className="text-xs text-earth-600 font-medium">Pick from Gallery</span></>
                           )}
                         </div>
                       </label>
-                      {newProduct.image ? (
-                        <div className="relative shrink-0">
-                          <img 
-                            src={newProduct.image} 
-                            alt="preview" 
-                            className="w-14 h-14 object-cover rounded-lg border-2 border-green-300 shadow-sm transition-all duration-500" 
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-14 h-14 bg-earth-100 rounded-lg border border-earth-200 flex items-center justify-center shrink-0">
-                          <ImageIcon size={20} className="text-earth-400" />
-                        </div>
-                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => openCamera()}
+                        className="flex items-center justify-center gap-2 px-4 py-3 border border-terracotta-300 bg-terracotta-50 hover:bg-terracotta-100 text-terracotta-800 rounded-lg text-xs font-bold transition-colors shadow-sm"
+                      >
+                        <Camera size={18} className="text-terracotta-600" />
+                        <span>Take Photo with Camera</span>
+                      </button>
                     </div>
+
                     {newProduct.image && (
-                       <button type="button" onClick={() => setOriginalImage(newProduct.image)} className="w-full py-3 bg-earth-900 text-white rounded-lg font-bold flex items-center justify-center gap-2 shadow-md hover:bg-earth-800 transition-colors">
-                          <Sparkles size={18} /> ✨ AI Image Studio (Debblur / White BG)
+                       <button type="button" onClick={() => setOriginalImage(newProduct.image)} className="w-full py-3 bg-earth-900 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-2 shadow-md hover:bg-earth-800 transition-colors">
+                          <Sparkles size={18} /> ✨ AI Image Studio (Deblur / Lighting / White BG)
                        </button>
                     )}
                   </div>

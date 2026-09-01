@@ -272,6 +272,49 @@ async def remove_bg_endpoint(
         logger.error(f"Remove BG error: {err}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to remove background. Please try again.")
 
+@app.post("/api/enhance-lighting")
+@app.post("/api/lighting-enhance")
+async def enhance_lighting_endpoint(
+    file: UploadFile = File(None),
+    image_file: UploadFile = File(None)
+):
+    """Step 2: Enhance lighting, contrast, and color balance using OpenCV/NumPy LAB adaptive engine."""
+    upload = file or image_file
+    if not upload:
+        raise HTTPException(status_code=400, detail="Image file is required (form parameter 'file' or 'image_file').")
+
+    try:
+        contents = await upload.read()
+        if len(contents) == 0:
+            raise HTTPException(status_code=400, detail="Uploaded image file is empty.")
+
+        input_image = Image.open(io.BytesIO(contents))
+        output_image = image_pipeline.enhance_lighting(input_image)
+
+        file_id = f"lighting_{uuid.uuid4().hex[:12]}.png"
+        file_path = os.path.join(UPLOAD_DIR, file_id)
+        output_image.save(file_path, "PNG")
+
+        buffer = io.BytesIO()
+        output_image.save(buffer, format="PNG")
+        base64_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        image_url = f"/api/image/{file_id}"
+
+        return JSONResponse({
+            "success": True,
+            "image_url": image_url,
+            "filename": file_id,
+            "mimeType": "image/png",
+            "base64Image": base64_str,
+            "base64_image": f"data:image/png;base64,{base64_str}",
+            "message": "Image lighting and contrast enhanced using OpenCV LAB Adaptive Engine!"
+        })
+    except HTTPException:
+        raise
+    except Exception as err:
+        logger.error(f"Lighting enhancement error: {err}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to enhance image lighting. Please try again.")
+
 @app.post("/api/improve-image")
 @app.post("/api/ai/enhance")
 @app.post("/api/enhance")
@@ -280,7 +323,7 @@ async def improve_image(
     file: UploadFile = File(None),
     image_file: UploadFile = File(None)
 ):
-    """Full Sequential Pipeline: Debblur (NAFNet) -> Remove Background (RMBG-2.0) -> White Background overlay."""
+    """Full Sequential 3-Stage Pipeline: Deblur (NAFNet) -> Adaptive Lighting (OpenCV LAB) -> Remove BG & White BG (RMBG-2.0)."""
     upload = file or image_file
     if not upload:
         raise HTTPException(status_code=400, detail="Image file is required (form parameter 'file' or 'image_file').")
@@ -300,7 +343,7 @@ async def improve_image(
 
         input_image = Image.open(io.BytesIO(contents))
         
-        # Execute sequential pipeline: Debblur -> Remove BG -> White Background
+        # Execute sequential pipeline: Deblur -> Lighting Enhancement -> Remove BG -> White Background
         output_image = image_pipeline.process_product_image(input_image)
         
         file_id = f"enhanced_{uuid.uuid4().hex[:12]}.png"
