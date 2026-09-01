@@ -132,9 +132,88 @@ async def health_check():
         "note": "Ready for IndicConformer inference" if is_ready else "HF gated repo token required. Set HF_TOKEN in ai-service/.env"
     }
 
+def is_error_response(text: str) -> bool:
+    """Check if the translated text is an HTTP error string (e.g. Google Translate 500 error page)."""
+    if not text:
+        return False
+    lower = text.lower()
+    error_keywords = [
+        "error 500", "server error", "that's an error",
+        "there was an error", "please try again later",
+        "that's all we know", "500.that", "http error"
+    ]
+    return any(keyword in lower for keyword in error_keywords)
+
+def generate_groq_seo_fields(native_text: str):
+    """Use Groq API key securely to translate Indic speech and generate SEO-friendly product details."""
+    groq_api_key = os.getenv("GROQ_API_KEY")
+    if not groq_api_key:
+        logger.warning("GROQ_API_KEY is not set.")
+        return None
+
+    import requests
+    import json
+
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {groq_api_key}",
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0"
+    }
+
+    prompt = (
+        "You are an elite e-commerce copywriter and SEO specialist for HastKala, a luxury marketplace celebrating authentic Indian heritage handicrafts.\n"
+        f"An artisan described their handcrafted product in their own words:\n\"{native_text}\"\n\n"
+        "Your task is to transform this raw input into an irresistible, premium, high-converting e-commerce listing that captivates online buyers.\n"
+        "Generate a structured JSON object with the following fields EXACTLY:\n"
+        "{\n"
+        "  \"english_text\": \"Clear, natural, fluent English translation of the spoken words\",\n"
+        "  \"title\": \"A compelling, high-converting, SEO-optimized title (6-12 words). Include the craft name, material, style, and key aesthetic appeal. (e.g., Vibrant Red & Yellow Handloom Sambalpuri Cotton Saree – Traditional Ikat Elegance)\",\n"
+        "  \"category\": \"Select the best matching category from: [Textiles, Pottery, Paintings, Jewelry, Woodwork, Metalware, Home Decor]\",\n"
+        "  \"material\": \"Specific primary material (e.g., 100% Handloom Cotton, Pure Tassar Silk, Natural Terracotta Clay, Handcast Dokra Brass, Teak Wood)\",\n"
+        "  \"description\": \"An engaging, persuasive 3-4 sentence e-commerce description crafted to drive online sales. Emphasize traditional handloom/artisan heritage, intricate craftsmanship, organic materials, tactile quality, and versatile use (festive celebrations, elegant home decor, or memorable gifting). Use evocative, sensory, and trust-building language.\"\n"
+        "}\n"
+        "Return ONLY valid JSON without markdown formatting or codeblocks."
+    )
+
+    models_to_try = ["groq/compound-mini", "groq/compound", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
+    for model in models_to_try:
+        try:
+            payload = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.3,
+                "max_tokens": 500
+            }
+            res = requests.post(url, headers=headers, json=payload, timeout=10)
+            if res.status_code == 200:
+                raw_out = res.json()["choices"][0]["message"]["content"].strip()
+                raw_out = raw_out.replace("```json", "").replace("```", "").strip()
+                parsed = json.loads(raw_out)
+                
+                english_text = parsed.get("english_text", "").strip()
+                title = parsed.get("title", "").strip()
+                category = parsed.get("category", "Textiles").strip()
+                material = parsed.get("material", "").strip()
+                description = parsed.get("description", "").strip()
+
+                if not is_error_response(english_text) and not is_error_response(title) and not is_error_response(description):
+                    logger.info(f"Successfully generated SEO fields via Groq using model {model}")
+                    return {
+                        "english_text": english_text or native_text,
+                        "title": title,
+                        "category": category or "Textiles",
+                        "material": material,
+                        "description": description or english_text or native_text
+                    }
+        except Exception as err:
+            logger.warning(f"Groq API call with model {model} failed: {err}")
+    
+    return None
+
 def extract_english_fields(native_text: str):
-    """Translate native Indic speech transcription into English and extract product fields."""
-    if not native_text or not native_text.strip():
+    """Translate native Indic speech transcription into English and extract product fields via Groq API."""
+    if not native_text or not native_text.strip() or is_error_response(native_text):
         return {
             "english_text": "",
             "title": "",
@@ -143,13 +222,27 @@ def extract_english_fields(native_text: str):
             "description": ""
         }
     
-    english_text = native_text.strip()
+    clean_native = native_text.strip()
+
+    # 1. Try Groq API for translation and SEO-friendly product details generation
+    groq_result = generate_groq_seo_fields(clean_native)
+    if groq_result and groq_result.get("english_text"):
+        return groq_result
+
+    # 2. Fallback translation via GoogleTranslator with error sanitization
+    english_text = clean_native
     try:
         from deep_translator import GoogleTranslator
-        english_text = GoogleTranslator(source='auto', target='en').translate(native_text.strip()) or native_text.strip()
+        translated = GoogleTranslator(source='auto', target='en').translate(clean_native)
+        if translated and not is_error_response(translated):
+            english_text = translated.strip()
     except Exception as t_err:
         logger.warning(f"English translation warning: {t_err}")
 
+    if is_error_response(english_text):
+        english_text = clean_native
+
+    # Heuristic fallback field extraction
     lower = english_text.lower()
 
     # Material Extraction
@@ -199,7 +292,7 @@ def extract_english_fields(native_text: str):
     elif "dokra" in lower or "dhokra" in lower:
         title = "Authentic Tribal Dokra Brass Artifact"
     else:
-        words = [w.capitalize() for w in english_text.split()[:6] if len(w) > 1]
+        words = [w.capitalize() for w in english_text.split()[:6] if len(w) > 1 and not is_error_response(w)]
         title = " ".join(words) if words else "Handcrafted Artisan Product"
 
     description = english_text
@@ -331,6 +424,10 @@ async def transcribe_audio(
             "english_text": extracted["english_text"],
             "language": used_language,
             "language_name": lang_name,
+            "title": extracted["title"],
+            "category": extracted["category"],
+            "material": extracted["material"],
+            "description": extracted["description"],
             "extracted_fields": {
                 "title": extracted["title"],
                 "category": extracted["category"],

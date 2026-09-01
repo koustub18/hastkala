@@ -42,7 +42,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
+    // Safety timeout in case Firebase auth initialization is delayed
+    const timer = setTimeout(() => {
+      setAuthState((prev) => (prev === 'initializing' ? 'unauthenticated' : prev));
+    }, 2000);
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      clearTimeout(timer);
       if (currentUser) {
         setUser(currentUser);
         setAuthState('profile_loading');
@@ -55,7 +61,10 @@ export const AuthProvider = ({ children }) => {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
   }, []);
 
   const reloadProfile = async () => {
@@ -84,7 +93,12 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {authState !== 'initializing' && children}
+      {authState === 'initializing' ? (
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#faf9f6' }}>
+          <div style={{ width: '48px', height: '48px', borderRadius: '50%', border: '4px solid #e0dcd3', borderTopColor: '#b85d19', animation: 'spin 1s linear infinite' }} />
+          <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+        </div>
+      ) : children}
     </AuthContext.Provider>
   );
 };

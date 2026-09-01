@@ -91,6 +91,9 @@ export default function AddProductScreen() {
       }
 
       setTranscriptionText(data.text || '');
+      if (data.title) setTitle(data.title);
+      if (data.category) setCategory(data.category);
+      if (data.description) setDescription(data.description);
     } catch (err: any) {
       console.error('Processing error', err);
       setVoiceError('Unable to transcribe the recording. Please try again.');

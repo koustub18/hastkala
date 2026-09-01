@@ -214,8 +214,8 @@ const ProductFormModal = ({
       title = words ? words.charAt(0).toUpperCase() + words.slice(1) : 'Handcrafted Artisan Product';
     }
 
-    // 4. Description Generation
-    const description = transcription.trim();
+    // 4. Description Generation (E-Commerce Formatted Fallback)
+    const description = `Discover this authentic handcrafted ${category.toLowerCase()} creation, masterfully crafted with ${material.toLowerCase() || 'natural materials'}. Each piece reflects Indian heritage and tradition, perfect for home decor, gifting, or festive celebrations.`;
 
     return { title, category, material, description };
   };
@@ -273,7 +273,24 @@ const ProductFormModal = ({
       setEnglishTranslationText(englishText);
       setDetectedLanguageName(data.language_name || data.language || 'Auto Detected');
       
-      applyExtractedFields(englishText);
+      // Extract fields from either extracted_fields object or top-level properties
+      const fields = data.extracted_fields || data;
+      const aiTitle = fields.title;
+      const aiCategory = fields.category;
+      const aiMaterial = fields.material;
+      const aiDescription = fields.description;
+
+      if (aiTitle || aiDescription || aiMaterial) {
+        setNewProduct(prev => ({
+          ...prev,
+          title: aiTitle || prev.title || '',
+          category: (CATEGORIES && CATEGORIES.includes(aiCategory)) ? aiCategory : (prev.category || (CATEGORIES && CATEGORIES[0])),
+          material: aiMaterial || prev.material || '',
+          description: aiDescription || prev.description || ''
+        }));
+      } else {
+        applyExtractedFields(englishText);
+      }
       
       setVoiceSuccess(true);
       setTimeout(() => setVoiceSuccess(false), 5000);
