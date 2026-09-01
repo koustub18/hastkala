@@ -333,7 +333,6 @@ const ProductFormModal = ({
     setEnhanceError('');
     setEnhancedImage(null);
     
-    // If we have a newly selected file, use that, otherwise use the existing URL (for edits)
     if (!originalImage) {
         setOriginalImage(selectedImageFile ? URL.createObjectURL(selectedImageFile) : newProduct.image);
     }
@@ -350,47 +349,62 @@ const ProductFormModal = ({
       if (!blob) throw new Error("Could not read image data");
 
       const formData = new FormData();
-      formData.append('image_file', blob, 'image.jpg');
+      formData.append('file', blob, 'image.png');
+      formData.append('image_file', blob, 'image.png');
 
-      const response = await fetch('/api/ai/enhance', {
-        method: 'POST',
-        body: formData,
-      });
+      const asrBaseUrl = import.meta.env.VITE_ASR_API_URL || import.meta.env.NEXT_PUBLIC_ASR_API_URL || 'http://localhost:8000';
+      
+      let response;
+      try {
+        response = await fetch(`${asrBaseUrl}/api/improve-image`, {
+          method: 'POST',
+          body: formData,
+        });
+      } catch (e) {
+        response = await fetch('/api/ai/enhance', {
+          method: 'POST',
+          body: formData,
+        });
+      }
 
       if (!response.ok) {
         throw new Error('Failed to enhance image');
       }
 
       const data = await response.json();
-      if (data.success && data.base64Image) {
-        const enhancedDataUrl = `data:${data.mimeType};base64,${data.base64Image}`;
-        setEnhancedImage(enhancedDataUrl);
+      if (data.success) {
+        const enhancedSrc = data.base64_image || (data.base64Image ? `data:${data.mimeType || 'image/png'};base64,${data.base64Image}` : (data.image_url ? (data.image_url.startsWith('http') ? data.image_url : `${asrBaseUrl}${data.image_url}`) : null));
+        
+        if (!enhancedSrc) throw new Error("Enhancement failed to produce image output");
+
+        setEnhancedImage(enhancedSrc);
         if (user?.uid) {
           createNotification({
             userId: user.uid,
             type: 'image_enhanced_success',
             title: 'Image Enhanced',
-            message: 'Your product image was successfully enhanced with AI.'
+            message: 'Background removed successfully using BRIA RMBG-2.0!'
           });
         }
       } else {
-        throw new Error("Enhancement failed on server");
+        throw new Error(data.error || "Enhancement failed on server");
       }
     } catch (err) {
       console.error('Enhancement error:', err);
-      setEnhanceError("Couldn't improve the photo. You can use the original image.");
+      setEnhanceError("We couldn't improve this image right now. Please try another image.");
       if (user?.uid) {
         createNotification({
           userId: user.uid,
           type: 'image_enhanced_failed',
           title: 'Enhancement Failed',
-          message: 'Could not improve the photo. Try again or use the original.'
+          message: 'Could not improve photo. You can continue using your original photo.'
         });
       }
     } finally {
       setIsEnhancing(false);
     }
   };
+
 
   const handleSuggestPrice = async () => {
     setIsPricing(true);
@@ -781,75 +795,96 @@ const ProductFormModal = ({
                 {originalImage ? (
                    <div className="bg-white p-4 rounded-xl border border-earth-200 shadow-sm">
                       {isEnhancing ? (
-                         <div className="flex flex-col items-center justify-center py-6">
-                            <Loader2 size={32} className="text-terracotta-500 animate-spin mb-3" />
-                            <p className="text-earth-700 font-bold">Improving your photo...</p>
-                            <p className="text-xs text-earth-500">Removing background and enhancing lighting</p>
+                         <div className="flex flex-col items-center justify-center py-8 text-center space-y-3">
+                            <Loader2 size={36} className="text-terracotta-600 animate-spin" />
+                            <div>
+                               <p className="text-earth-900 font-bold text-base flex items-center justify-center gap-1.5">
+                                  <Sparkles size={18} className="text-terracotta-500 animate-pulse" />
+                                  ✨ AI is improving your image...
+                               </p>
+                               <p className="text-xs text-earth-600 mt-1 font-medium">Removing background</p>
+                               <p className="text-[11px] text-earth-400">Preparing product image</p>
+                            </div>
                          </div>
                       ) : enhanceError ? (
-                         <div className="flex flex-col items-center justify-center py-6">
-                            <div className="text-red-500 font-bold mb-4">{enhanceError}</div>
-                            <img src={originalImage} alt="original" className="w-32 h-32 object-cover rounded-lg border-2 border-earth-200 mb-4" />
+                         <div className="flex flex-col items-center justify-center py-6 text-center">
+                            <div className="text-red-500 font-bold text-sm mb-3">{enhanceError}</div>
+                            <img src={originalImage} alt="Original Product Photo" className="w-32 h-32 object-contain rounded-lg border border-earth-200 mb-4 bg-earth-50" />
                             <button type="button" onClick={() => { 
                                if (selectedImageFile) uploadImage(selectedImageFile, 'image');
                                setOriginalImage(null); 
                                setEnhanceError(''); 
-                            }} className="px-6 py-2 bg-earth-900 text-white rounded-lg font-bold">Use Original Photo</button>
+                            }} className="px-6 py-2.5 bg-earth-900 text-white rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-earth-800">Keep Original</button>
                          </div>
                       ) : enhancedImage ? (
                          <div className="flex flex-col items-center">
-                            <h3 className="font-bold text-forest-600 mb-4 flex items-center gap-2"><Sparkles size={16}/> Photo improved</h3>
-                            <div className="flex gap-4 mb-6 w-full">
-                               <div className="flex-1">
-                                  <span className="text-[10px] font-bold text-earth-500 uppercase block mb-1 text-center">Before</span>
-                                  <img src={originalImage} alt="before" className="w-full h-32 object-contain bg-earth-50 rounded-lg border border-earth-200" />
+                            <div className="flex items-center justify-between w-full mb-3">
+                               <h3 className="font-serif font-bold text-earth-900 text-sm flex items-center gap-2">
+                                  <Sparkles size={16} className="text-terracotta-600" /> AI Image Enhancement
+                               </h3>
+                               <span className="text-[11px] font-bold text-green-700 bg-green-50 px-2.5 py-0.5 rounded-full border border-green-200 flex items-center gap-1">
+                                  Background removed ✓
+                               </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 mb-5 w-full">
+                               <div className="bg-earth-50 p-2.5 rounded-xl border border-earth-200 flex flex-col items-center">
+                                  <span className="text-[10px] font-bold text-earth-500 uppercase tracking-wider mb-2">Original</span>
+                                  <img src={originalImage} alt="Original Product Photo" className="w-full h-36 object-contain rounded-lg bg-white" />
                                </div>
-                               <div className="flex-1">
-                                  <span className="text-[10px] font-bold text-terracotta-600 uppercase block mb-1 text-center">After</span>
-                                  <img src={enhancedImage} alt="after" className="w-full h-32 object-contain bg-earth-50 rounded-lg border-2 border-terracotta-400 shadow-md" />
+                               <div className="bg-terracotta-50/50 p-2.5 rounded-xl border-2 border-terracotta-400 shadow-md flex flex-col items-center">
+                                  <span className="text-[10px] font-bold text-terracotta-700 uppercase tracking-wider mb-2">Enhanced</span>
+                                  <img src={enhancedImage} alt="Clean Product Image" className="w-full h-36 object-contain rounded-lg bg-white" />
                                </div>
                             </div>
+
                             <div className="flex flex-col sm:flex-row gap-3 w-full">
                                <button type="button" onClick={() => { 
                                    if (selectedImageFile) uploadImage(selectedImageFile, 'image');
                                    setOriginalImage(null); 
                                    setEnhancedImage(null); 
-                               }} className="flex-1 py-3 border border-earth-200 text-earth-700 rounded-lg font-bold hover:bg-earth-50 transition-colors">Use Original Photo</button>
+                               }} className="flex-1 py-3 border border-earth-300 text-earth-700 rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-earth-50 transition-colors">Keep Original</button>
                                <button type="button" onClick={() => { 
                                    try {
-                                     const arr = enhancedImage.split(',');
-                                     const mime = arr[0].match(/:(.*?);/)[1];
-                                     const bstr = atob(arr[1]);
-                                     let n = bstr.length;
-                                     const u8arr = new Uint8Array(n);
-                                     while(n--){
-                                         u8arr[n] = bstr.charCodeAt(n);
+                                     if (enhancedImage.startsWith('data:')) {
+                                       const arr = enhancedImage.split(',');
+                                       const mime = arr[0].match(/:(.*?);/)[1];
+                                       const bstr = atob(arr[1]);
+                                       let n = bstr.length;
+                                       const u8arr = new Uint8Array(n);
+                                       while(n--){
+                                           u8arr[n] = bstr.charCodeAt(n);
+                                       }
+                                       const file = new File([u8arr], "enhanced_product.png", {type: mime});
+                                       uploadImage(file, 'image');
+                                     } else {
+                                       setNewProduct(p => ({ ...p, image: enhancedImage }));
                                      }
-                                     const file = new File([u8arr], "enhanced.jpg", {type:mime});
-                                     uploadImage(file, 'image');
                                    } catch (e) {
                                      console.error(e);
+                                     setNewProduct(p => ({ ...p, image: enhancedImage }));
                                    }
                                    setOriginalImage(null); 
                                    setEnhancedImage(null); 
-                               }} className="flex-1 py-3 bg-terracotta-600 text-white rounded-lg font-bold hover:bg-terracotta-700 shadow-lg shadow-terracotta-900/20 transition-colors">Use Enhanced Photo</button>
+                               }} className="flex-1 py-3 bg-terracotta-600 text-white rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-terracotta-700 shadow-lg shadow-terracotta-900/20 transition-colors flex items-center justify-center gap-1.5"><CheckCircle2 size={16} /> Use Enhanced Image</button>
                             </div>
-                            <button type="button" onClick={() => { setEnhancedImage(null); handleEnhanceImage(); }} className="mt-4 text-xs text-earth-500 hover:text-earth-700 underline transition-colors">Try Again</button>
+                            <button type="button" onClick={() => { setEnhancedImage(null); handleEnhanceImage(); }} className="mt-3 text-xs text-earth-500 hover:text-earth-700 underline transition-colors">Try Again</button>
                          </div>
                       ) : (
                          <div className="flex flex-col items-center">
-                            <h3 className="font-bold text-earth-800 mb-4 flex items-center gap-2">Image Selected</h3>
-                            <img src={originalImage} alt="selected" className="w-full h-48 object-contain bg-earth-50 rounded-lg border border-earth-200 mb-6" />
+                            <h3 className="font-bold text-earth-800 mb-3 flex items-center gap-2 text-sm">Image Preview</h3>
+                            <img src={originalImage} alt="selected" className="w-full h-44 object-contain bg-earth-50 rounded-lg border border-earth-200 mb-4" />
                             <div className="flex flex-col sm:flex-row gap-3 w-full">
                                <button type="button" onClick={() => { 
                                    if (selectedImageFile) uploadImage(selectedImageFile, 'image');
                                    setOriginalImage(null); 
-                               }} className="flex-1 py-3 border border-earth-200 text-earth-700 rounded-lg font-bold hover:bg-earth-50 transition-colors">Use As Is</button>
-                               <button type="button" onClick={handleEnhanceImage} className="flex-1 py-3 bg-earth-900 text-white rounded-lg font-bold flex justify-center items-center gap-2 hover:bg-earth-800 shadow-md transition-colors"><Sparkles size={18} /> ✨ Improve Photo</button>
+                               }} className="flex-1 py-3 border border-earth-300 text-earth-700 rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-earth-50 transition-colors">Keep Original</button>
+                               <button type="button" onClick={handleEnhanceImage} className="flex-1 py-3 bg-earth-900 text-white rounded-lg font-bold text-xs uppercase tracking-wider flex justify-center items-center gap-2 hover:bg-earth-800 shadow-md transition-colors"><Sparkles size={16} /> ✨ Improve Image</button>
                             </div>
                          </div>
                       )}
                    </div>
+
                 ) : (
                   <div className="flex flex-col gap-3">
                     <div className="flex gap-3 items-center">

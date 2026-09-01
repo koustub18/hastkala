@@ -153,53 +153,38 @@ router.post('/enhance', imageLimiter, (req, res) => {
         return res.status(400).json({ success: false, error: 'Image file is required.' });
       }
 
-      const { execFile } = require('child_process');
-      const fs = require('fs');
-      const path = require('path');
-      const os = require('os');
-      const crypto = require('crypto');
+      const aiServiceUrl = process.env.ASR_API_URL || 'http://localhost:8000';
+      const formData = new FormData();
+      const fileBlob = new Blob([req.file.buffer], { type: req.file.mimetype || 'image/jpeg' });
+      formData.append('file', fileBlob, req.file.originalname || 'image.jpg');
 
-      const tempDir = os.tmpdir();
-      const id = crypto.randomBytes(16).toString('hex');
-      const inputPath = path.join(tempDir, `input_${id}.jpg`);
-      const outputPath = path.join(tempDir, `output_${id}.jpg`);
-
-      // Write the uploaded buffer to a temp file
-      fs.writeFileSync(inputPath, req.file.buffer);
-
-      const pythonExec = path.join(__dirname, '..', 'venv', 'bin', 'python3');
-      const scriptPath = path.join(__dirname, '..', 'image_pipeline', 'process.py');
-
-      execFile(pythonExec, [scriptPath, '--input', inputPath, '--output', outputPath], { timeout: 30000 }, (error, stdout, stderr) => {
-        try {
-          if (error) {
-            console.error('Python Processing Error:', stderr || error.message);
-            return res.status(500).json({ success: false, error: 'Failed to improve the photo. Please try again.' });
-          }
-
-          if (fs.existsSync(outputPath)) {
-            const outputBuffer = fs.readFileSync(outputPath);
-            res.status(200).json({
-              success: true,
-              base64Image: outputBuffer.toString('base64'),
-              mimeType: 'image/jpeg'
-            });
-          } else {
-            console.error('Python Processing Error: Output file not found');
-            res.status(500).json({ success: false, error: 'Failed to improve the photo.' });
-          }
-        } finally {
-          // Cleanup temp files
-          if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
-          if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
-        }
+      const response = await fetch(`${aiServiceUrl}/api/improve-image`, {
+        method: 'POST',
+        body: formData,
       });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error('AI Service enhance HTTP error:', response.status, errText);
+        return res.status(500).json({ success: false, error: "We couldn't improve this image right now. Please try another image." });
+      }
+
+      const data = await response.json();
+      return res.status(200).json({
+        success: true,
+        image_url: data.image_url ? `${aiServiceUrl}${data.image_url}` : null,
+        base64Image: data.base64Image || (data.base64_image ? data.base64_image.replace(/^data:image\/png;base64,/, '') : null),
+        mimeType: data.mimeType || 'image/png',
+        message: data.message || 'Background removed successfully using BRIA RMBG-2.0'
+      });
+
     } catch (error) {
       console.error('AI Enhancement Error:', error);
-      res.status(500).json({ success: false, error: 'Internal Server Error' });
+      res.status(500).json({ success: false, error: "We couldn't improve this image right now. Please try another image." });
     }
   });
 });
+
 
 // Configure multer for audio upload
 const uploadAudio = multer({ 

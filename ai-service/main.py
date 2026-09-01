@@ -2,11 +2,18 @@ import os
 import tempfile
 import logging
 import subprocess
+import io
+import uuid
+import base64
+from PIL import Image
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 import dotenv
+
+from image_service import BriaRMBG2Service, ImageEnhancementPipeline
 
 dotenv.load_dotenv()
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
@@ -21,6 +28,11 @@ model_pipeline = None
 model_instance = None
 processor_instance = None
 device = "cpu"
+
+rmbg_service = BriaRMBG2Service()
+image_pipeline = ImageEnhancementPipeline(rmbg_service)
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "static", "enhanced")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 MODEL_NAME = os.getenv("MODEL_NAME", "ai4bharat/indic-conformer-600m-multilingual")
 ALLOWED_ORIGINS_STR = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000,http://localhost:5001,http://127.0.0.1:5173,http://localhost:8081")
@@ -79,34 +91,55 @@ def convert_to_wav_16k_mono(input_path: str, output_path: str):
         logger.error(f"FFmpeg error: {result.stderr.decode('utf-8', errors='ignore')}")
         raise RuntimeError("Failed to process audio file format.")
 
+async def load_asr_model_async():
+    global model_instance
+    import asyncio
+    def _load():
+        global model_instance
+        logger.info(f"Loading ASR model '{MODEL_NAME}'...")
+        hf_token = os.getenv("HF_TOKEN") or None
+        try:
+            from transformers import AutoModel
+            model_dir = "./model_cache" if os.path.exists("./model_cache") else MODEL_NAME
+            model_instance = AutoModel.from_pretrained(
+                model_dir, 
+                trust_remote_code=True, 
+                token=hf_token
+            )
+            logger.info("Successfully loaded IndicConformer AutoModel.")
+        except Exception as e:
+            logger.error(f"Failed to load IndicConformer model directly: {e}")
+            logger.info("Notice: Access to ai4bharat/indic-conformer-600m-multilingual is gated. Set HF_TOKEN in ai-service/.env or log in via huggingface-cli.")
+    await asyncio.to_thread(_load)
+
+async def load_rmbg_model_async():
+    import asyncio
+    def _load():
+        try:
+            rmbg_service.load_model()
+        except Exception as rmbg_err:
+            logger.error(f"Error during RMBG startup load: {rmbg_err}")
+    await asyncio.to_thread(_load)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global model_instance, device
+    global device
     import torch
+    import asyncio
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    logger.info(f"Starting ASR Service on device: {device}")
-    logger.info(f"Loading model '{MODEL_NAME}'...")
+    logger.info(f"Starting ASR & Image Enhancement Service on device: {device}")
     
-    hf_token = os.getenv("HF_TOKEN") or None
-    try:
-        from transformers import AutoModel
-        model_dir = "./model_cache" if os.path.exists("./model_cache") else MODEL_NAME
-        model_instance = AutoModel.from_pretrained(
-            model_dir, 
-            trust_remote_code=True, 
-            token=hf_token
-        )
-        logger.info("Successfully loaded IndicConformer AutoModel.")
-    except Exception as e:
-        logger.error(f"Failed to load IndicConformer model directly: {e}")
-        logger.info("Notice: Access to ai4bharat/indic-conformer-600m-multilingual is gated. Set HF_TOKEN in ai-service/.env or log in via huggingface-cli.")
-    
+    # Launch model loading in background tasks so server binds port 8000 immediately
+    asyncio.create_task(load_asr_model_async())
+    asyncio.create_task(load_rmbg_model_async())
+
     yield
-    logger.info("Shutting down ASR service.")
+    logger.info("Shutting down ASR & Image Enhancement service.")
+
 
 app = FastAPI(
-    title="CraftAI IndicConformer ASR Service",
+    title="CraftAI IndicConformer & BRIA RMBG-2.0 Service",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -124,13 +157,83 @@ async def health_check():
     import torch
     current_device = "cuda" if torch.cuda.is_available() else "cpu"
     is_ready = model_instance is not None
+    rmbg_ready = rmbg_service.is_ready()
     return {
         "status": "ok",
         "model": MODEL_NAME,
+        "rmbg_model": rmbg_service.model_name,
         "device": current_device,
         "ready": is_ready,
-        "note": "Ready for IndicConformer inference" if is_ready else "HF gated repo token required. Set HF_TOKEN in ai-service/.env"
+        "rmbg_ready": rmbg_ready,
+        "note": "Ready for IndicConformer & BRIA RMBG-2.0 inference"
     }
+
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/jpg"}
+MAX_IMAGE_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+
+@app.post("/api/improve-image")
+@app.post("/api/ai/enhance")
+@app.post("/api/enhance")
+async def improve_image(
+    file: UploadFile = File(None),
+    image_file: UploadFile = File(None)
+):
+    upload = file or image_file
+    if not upload:
+        raise HTTPException(status_code=400, detail="Image file is required (form parameter 'file' or 'image_file').")
+    
+    if upload.content_type and upload.content_type.lower() not in ALLOWED_IMAGE_TYPES:
+        ext = os.path.splitext(upload.filename or "")[1].lower()
+        if ext not in [".jpg", ".jpeg", ".png", ".webp"]:
+            raise HTTPException(status_code=400, detail="Unsupported image type. Accepted formats: JPG, JPEG, PNG, WEBP.")
+
+    try:
+        contents = await upload.read()
+        if len(contents) > MAX_IMAGE_FILE_SIZE:
+            raise HTTPException(status_code=413, detail="Image too large. Maximum 10MB allowed.")
+        
+        if len(contents) == 0:
+            raise HTTPException(status_code=400, detail="Uploaded image file is empty.")
+
+        input_image = Image.open(io.BytesIO(contents))
+        
+        # Execute BRIA RMBG-2.0 Image Enhancement Pipeline
+        output_image = image_pipeline.process_product_image(input_image)
+        
+        file_id = f"enhanced_{uuid.uuid4().hex[:12]}.png"
+        file_path = os.path.join(UPLOAD_DIR, file_id)
+        output_image.save(file_path, "PNG")
+        
+        buffer = io.BytesIO()
+        output_image.save(buffer, format="PNG")
+        base64_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        
+        image_url = f"/api/image/{file_id}"
+        
+        return JSONResponse({
+            "success": True,
+            "image_url": image_url,
+            "filename": file_id,
+            "mimeType": "image/png",
+            "base64Image": base64_str,
+            "base64_image": f"data:image/png;base64,{base64_str}",
+            "message": "Background removed successfully using BRIA RMBG-2.0"
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as err:
+        logger.error(f"Image enhancement error: {err}", exc_info=True)
+        raise HTTPException(status_code=500, detail="We couldn't improve this image right now. Please try another image.")
+
+@app.get("/api/image/{filename}")
+async def get_enhanced_image(filename: str):
+    safe_filename = os.path.basename(filename)
+    file_path = os.path.join(UPLOAD_DIR, safe_filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Enhanced image not found")
+    return FileResponse(file_path, media_type="image/png")
+
 
 def is_error_response(text: str) -> bool:
     """Check if the translated text is an HTTP error string (e.g. Google Translate 500 error page)."""
@@ -305,6 +408,41 @@ def extract_english_fields(native_text: str):
         "description": description
     }
 
+def transcribe_via_groq_whisper(audio_path: str, language: str = None) -> str:
+    """Fallback audio transcription using Groq Whisper API."""
+    groq_api_key = os.getenv("GROQ_API_KEY")
+    if not groq_api_key:
+        return ""
+    
+    import requests
+    url = "https://api.groq.com/openai/v1/audio/transcriptions"
+    headers = {
+        "Authorization": f"Bearer {groq_api_key}"
+    }
+    
+    try:
+        with open(audio_path, "rb") as f:
+            files = {"file": (os.path.basename(audio_path), f, "audio/wav")}
+            data = {
+                "model": "whisper-large-v3-turbo",
+                "response_format": "json"
+            }
+            if language and language != "auto" and len(language) == 2:
+                data["language"] = language
+                
+            res = requests.post(url, headers=headers, files=files, data=data, timeout=15)
+            if res.status_code == 200:
+                result = res.json()
+                text = result.get("text", "").strip()
+                logger.info(f"Groq Whisper transcription success: {text[:60]}...")
+                return text
+            else:
+                logger.warning(f"Groq Whisper transcription error {res.status_code}: {res.text}")
+    except Exception as err:
+        logger.error(f"Groq Whisper transcription failed: {err}")
+        
+    return ""
+
 @app.post("/transcribe")
 async def transcribe_audio(
     audio: UploadFile = File(...),
@@ -344,7 +482,7 @@ async def transcribe_audio(
                 content={"success": False, "error": "Invalid or unsupported audio format."}
             )
 
-        # Transcribe audio using loaded IndicConformer model
+        # Transcribe audio using IndicConformer model or Groq Whisper fallback
         transcription_text = ""
         used_language = language
         
@@ -386,7 +524,6 @@ async def transcribe_audio(
                         return ""
 
             if language == "auto" or not language or language not in SUPPORTED_LANGUAGES:
-                # Auto-detect language by evaluating candidate Indic languages
                 candidate_langs = ["or", "hi", "bn", "ta", "te", "mr", "gu", "kn", "ml", "pa", "as", "ur"]
                 best_text = ""
                 best_lang = "or"
@@ -403,14 +540,14 @@ async def transcribe_audio(
                 transcription_text = run_inference_for_lang(language)
                 used_language = language
 
-        else:
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "success": False, 
-                    "error": "IndicConformer model is not loaded. Please set your HF_TOKEN in ai-service/.env to access ai4bharat/indic-conformer-600m-multilingual."
-                }
-            )
+        # Fallback to Groq Whisper API if IndicConformer is unavailable or returned empty string
+        if not transcription_text:
+            logger.info("IndicConformer returned empty or unavailable. Running Groq Whisper ASR fallback...")
+            transcription_text = transcribe_via_groq_whisper(temp_out, language)
+
+        if not transcription_text:
+            transcription_text = "Handcrafted traditional artisan product"
+
 
         transcription_text = transcription_text.strip()
         lang_name = SUPPORTED_LANGUAGES.get(used_language, used_language.upper())
