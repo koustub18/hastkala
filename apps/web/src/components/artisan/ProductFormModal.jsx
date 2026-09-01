@@ -31,6 +31,9 @@ const ProductFormModal = ({
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
+  const [isDeblurring, setIsDeblurring] = useState(false);
+  const [isRemovingBg, setIsRemovingBg] = useState(false);
+  const [deblurredImage, setDeblurredImage] = useState(null);
   const [enhancedImage, setEnhancedImage] = useState(null);
   const [originalImage, setOriginalImage] = useState(null);
   const [selectedImageFile, setSelectedImageFile] = useState(null);
@@ -327,25 +330,158 @@ const ProductFormModal = ({
     }
   };
 
-  const handleEnhanceImage = async () => {
-    if (!selectedImageFile && !newProduct.image) return;
-    setIsEnhancing(true);
+  const getImageBlob = async (targetSrc) => {
+    if (selectedImageFile && !targetSrc) return selectedImageFile;
+    const srcToUse = targetSrc || originalImage || newProduct.image;
+    if (!srcToUse) return null;
+
+    if (srcToUse.startsWith('data:')) {
+      const arr = srcToUse.split(',');
+      const mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while(n--){
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new File([u8arr], "product.png", { type: mime });
+    } else {
+      const res = await fetch(srcToUse);
+      return await res.blob();
+    }
+  };
+
+  const handleDeblurImage = async () => {
+    if (!selectedImageFile && !newProduct.image && !originalImage) return;
+    setIsDeblurring(true);
     setEnhanceError('');
-    setEnhancedImage(null);
     
     if (!originalImage) {
-        setOriginalImage(selectedImageFile ? URL.createObjectURL(selectedImageFile) : newProduct.image);
+      setOriginalImage(selectedImageFile ? URL.createObjectURL(selectedImageFile) : newProduct.image);
     }
     
     try {
-      let blob;
-      if (selectedImageFile) {
-          blob = selectedImageFile;
-      } else {
-          const res = await fetch(newProduct.image);
-          blob = await res.blob();
+      const blob = await getImageBlob(deblurredImage || originalImage);
+      if (!blob) throw new Error("Could not read image data");
+
+      const formData = new FormData();
+      formData.append('file', blob, 'image.png');
+      formData.append('image_file', blob, 'image.png');
+
+      const asrBaseUrl = import.meta.env.VITE_ASR_API_URL || import.meta.env.NEXT_PUBLIC_ASR_API_URL || 'http://localhost:8000';
+      
+      let response;
+      try {
+        response = await fetch(`${asrBaseUrl}/api/deblur`, {
+          method: 'POST',
+          body: formData,
+        });
+      } catch (e) {
+        response = await fetch('/api/ai/deblur', {
+          method: 'POST',
+          body: formData,
+        });
       }
 
+      if (!response.ok) throw new Error('Failed to deblur image');
+
+      const data = await response.json();
+      if (data.success) {
+        const deblurredSrc = data.base64_image || (data.base64Image ? `data:${data.mimeType || 'image/png'};base64,${data.base64Image}` : (data.image_url ? (data.image_url.startsWith('http') ? data.image_url : `${asrBaseUrl}${data.image_url}`) : null));
+        if (!deblurredSrc) throw new Error("Deblur failed to produce image output");
+
+        setDeblurredImage(deblurredSrc);
+        if (user?.uid) {
+          createNotification({
+            userId: user.uid,
+            type: 'image_deblurred_success',
+            title: 'Image Deblurred',
+            message: 'Image sharpened successfully using NAFNet ONNX model!'
+          });
+        }
+      } else {
+        throw new Error(data.error || "Deblur failed on server");
+      }
+    } catch (err) {
+      console.error('Debblur error:', err);
+      setEnhanceError("Could not deblur this image. Please try another photo.");
+    } finally {
+      setIsDeblurring(false);
+    }
+  };
+
+  const handleRemoveBgImage = async (overrideImageSrc = null) => {
+    const inputSrc = overrideImageSrc || deblurredImage || originalImage || newProduct.image;
+    if (!inputSrc && !selectedImageFile) return;
+    
+    setIsRemovingBg(true);
+    setEnhanceError('');
+    
+    if (!originalImage) {
+      setOriginalImage(selectedImageFile ? URL.createObjectURL(selectedImageFile) : newProduct.image);
+    }
+    
+    try {
+      const blob = await getImageBlob(inputSrc);
+      if (!blob) throw new Error("Could not read image data");
+
+      const formData = new FormData();
+      formData.append('file', blob, 'image.png');
+      formData.append('image_file', blob, 'image.png');
+
+      const asrBaseUrl = import.meta.env.VITE_ASR_API_URL || import.meta.env.NEXT_PUBLIC_ASR_API_URL || 'http://localhost:8000';
+      
+      let response;
+      try {
+        response = await fetch(`${asrBaseUrl}/api/remove-bg`, {
+          method: 'POST',
+          body: formData,
+        });
+      } catch (e) {
+        response = await fetch('/api/ai/remove-bg', {
+          method: 'POST',
+          body: formData,
+        });
+      }
+
+      if (!response.ok) throw new Error('Failed to remove background');
+
+      const data = await response.json();
+      if (data.success) {
+        const bgRemovedSrc = data.base64_image || (data.base64Image ? `data:${data.mimeType || 'image/png'};base64,${data.base64Image}` : (data.image_url ? (data.image_url.startsWith('http') ? data.image_url : `${asrBaseUrl}${data.image_url}`) : null));
+        if (!bgRemovedSrc) throw new Error("Background removal failed to produce image output");
+
+        setEnhancedImage(bgRemovedSrc);
+        if (user?.uid) {
+          createNotification({
+            userId: user.uid,
+            type: 'image_enhanced_success',
+            title: 'Background Removed',
+            message: 'Background removed with crisp white background overlay!'
+          });
+        }
+      } else {
+        throw new Error(data.error || "Background removal failed on server");
+      }
+    } catch (err) {
+      console.error('Remove BG error:', err);
+      setEnhanceError("We couldn't remove the background right now. Please try another image.");
+    } finally {
+      setIsRemovingBg(false);
+    }
+  };
+
+  const handleEnhanceImage = async () => {
+    if (!selectedImageFile && !newProduct.image && !originalImage) return;
+    setIsEnhancing(true);
+    setEnhanceError('');
+    
+    if (!originalImage) {
+      setOriginalImage(selectedImageFile ? URL.createObjectURL(selectedImageFile) : newProduct.image);
+    }
+    
+    try {
+      const blob = await getImageBlob(originalImage);
       if (!blob) throw new Error("Could not read image data");
 
       const formData = new FormData();
@@ -367,9 +503,7 @@ const ProductFormModal = ({
         });
       }
 
-      if (!response.ok) {
-        throw new Error('Failed to enhance image');
-      }
+      if (!response.ok) throw new Error('Failed to enhance image');
 
       const data = await response.json();
       if (data.success) {
@@ -383,7 +517,7 @@ const ProductFormModal = ({
             userId: user.uid,
             type: 'image_enhanced_success',
             title: 'Image Enhanced',
-            message: 'Background removed successfully using BRIA RMBG-2.0!'
+            message: 'Image deblurred & background removed with white background!'
           });
         }
       } else {
@@ -793,93 +927,146 @@ const ProductFormModal = ({
                 <label className="block text-xs font-bold text-earth-700 uppercase tracking-wider mb-2">Main Product Photo *</label>
                 
                 {originalImage ? (
-                   <div className="bg-white p-4 rounded-xl border border-earth-200 shadow-sm">
-                      {isEnhancing ? (
+                   <div className="bg-white p-4 rounded-xl border border-earth-200 shadow-sm space-y-4">
+                      {isDeblurring || isRemovingBg || isEnhancing ? (
                          <div className="flex flex-col items-center justify-center py-8 text-center space-y-3">
                             <Loader2 size={36} className="text-terracotta-600 animate-spin" />
                             <div>
                                <p className="text-earth-900 font-bold text-base flex items-center justify-center gap-1.5">
                                   <Sparkles size={18} className="text-terracotta-500 animate-pulse" />
-                                  ✨ AI is improving your image...
+                                  {isDeblurring ? "🔍 NAFNet is deblurring your image..." : isRemovingBg ? "✨ Removing background & adding white studio background..." : "⚡ Running Full AI Pipeline (Deblur + Remove BG)..."}
                                </p>
-                               <p className="text-xs text-earth-600 mt-1 font-medium">Removing background</p>
-                               <p className="text-[11px] text-earth-400">Preparing product image</p>
+                               <p className="text-xs text-earth-600 mt-1 font-medium">Processing locally with AI models</p>
+                               <p className="text-[11px] text-earth-400">Restoring quality & background</p>
                             </div>
                          </div>
                       ) : enhanceError ? (
                          <div className="flex flex-col items-center justify-center py-6 text-center">
                             <div className="text-red-500 font-bold text-sm mb-3">{enhanceError}</div>
-                            <img src={originalImage} alt="Original Product Photo" className="w-32 h-32 object-contain rounded-lg border border-earth-200 mb-4 bg-earth-50" />
+                            <img src={deblurredImage || originalImage} alt="Product Photo" className="w-32 h-32 object-contain rounded-lg border border-earth-200 mb-4 bg-earth-50" />
                             <button type="button" onClick={() => { 
                                if (selectedImageFile) uploadImage(selectedImageFile, 'image');
                                setOriginalImage(null); 
+                               setDeblurredImage(null);
+                               setEnhancedImage(null);
                                setEnhanceError(''); 
                             }} className="px-6 py-2.5 bg-earth-900 text-white rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-earth-800">Keep Original</button>
                          </div>
-                      ) : enhancedImage ? (
+                      ) : (
                          <div className="flex flex-col items-center">
                             <div className="flex items-center justify-between w-full mb-3">
                                <h3 className="font-serif font-bold text-earth-900 text-sm flex items-center gap-2">
-                                  <Sparkles size={16} className="text-terracotta-600" /> AI Image Enhancement
+                                  <Sparkles size={16} className="text-terracotta-600" /> AI Image Studio
                                </h3>
-                               <span className="text-[11px] font-bold text-green-700 bg-green-50 px-2.5 py-0.5 rounded-full border border-green-200 flex items-center gap-1">
-                                  Background removed ✓
+                               <span className="text-[11px] font-bold text-terracotta-700 bg-terracotta-50 px-2.5 py-0.5 rounded-full border border-terracotta-200">
+                                  {enhancedImage ? "Final: White Background ✓" : deblurredImage ? "Step 1: Deblurred ✓" : "Original Image"}
                                </span>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4 mb-5 w-full">
-                               <div className="bg-earth-50 p-2.5 rounded-xl border border-earth-200 flex flex-col items-center">
-                                  <span className="text-[10px] font-bold text-earth-500 uppercase tracking-wider mb-2">Original</span>
-                                  <img src={originalImage} alt="Original Product Photo" className="w-full h-36 object-contain rounded-lg bg-white" />
+                            {/* Image Grid Comparison */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 w-full">
+                               <div className="bg-earth-50 p-2 rounded-xl border border-earth-200 flex flex-col items-center">
+                                  <span className="text-[10px] font-bold text-earth-500 uppercase tracking-wider mb-1">
+                                     {deblurredImage ? "Original Blurry" : "Original"}
+                                  </span>
+                                  <img src={originalImage} alt="Original" className="w-full h-32 object-contain rounded-lg bg-white" />
                                </div>
-                               <div className="bg-terracotta-50/50 p-2.5 rounded-xl border-2 border-terracotta-400 shadow-md flex flex-col items-center">
-                                  <span className="text-[10px] font-bold text-terracotta-700 uppercase tracking-wider mb-2">Enhanced</span>
-                                  <img src={enhancedImage} alt="Clean Product Image" className="w-full h-36 object-contain rounded-lg bg-white" />
-                               </div>
+
+                               {enhancedImage ? (
+                                  <div className="bg-green-50/60 p-2 rounded-xl border-2 border-green-500 shadow-sm flex flex-col items-center">
+                                     <span className="text-[10px] font-bold text-green-700 uppercase tracking-wider mb-1">Clean White Background</span>
+                                     <img src={enhancedImage} alt="Enhanced" className="w-full h-32 object-contain rounded-lg bg-white" />
+                                  </div>
+                               ) : deblurredImage ? (
+                                  <div className="bg-blue-50/60 p-2 rounded-xl border-2 border-blue-500 shadow-sm flex flex-col items-center">
+                                     <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1">Deblurred (NAFNet)</span>
+                                     <img src={deblurredImage} alt="Deblurred" className="w-full h-32 object-contain rounded-lg bg-white" />
+                                  </div>
+                               ) : (
+                                  <div className="bg-earth-50/50 p-2 rounded-xl border border-dashed border-earth-300 flex flex-col items-center justify-center text-center">
+                                     <Sparkles size={24} className="text-earth-400 mb-1" />
+                                     <p className="text-xs font-semibold text-earth-600">AI Enhancement Ready</p>
+                                     <p className="text-[10px] text-earth-400">Click below to Debblur or Remove BG</p>
+                                  </div>
+                               )}
                             </div>
 
-                            <div className="flex flex-col sm:flex-row gap-3 w-full">
-                               <button type="button" onClick={() => { 
-                                   if (selectedImageFile) uploadImage(selectedImageFile, 'image');
-                                   setOriginalImage(null); 
-                                   setEnhancedImage(null); 
-                               }} className="flex-1 py-3 border border-earth-300 text-earth-700 rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-earth-50 transition-colors">Keep Original</button>
-                               <button type="button" onClick={() => { 
-                                   if (enhancedImage) {
-                                     setNewProduct(p => ({ ...p, image: enhancedImage }));
-                                     if (enhancedImage.startsWith('data:')) {
-                                       try {
-                                         const arr = enhancedImage.split(',');
-                                         const mime = arr[0].match(/:(.*?);/)[1];
-                                         const bstr = atob(arr[1]);
-                                         let n = bstr.length;
-                                         const u8arr = new Uint8Array(n);
-                                         while(n--){
-                                             u8arr[n] = bstr.charCodeAt(n);
+                            {/* Step-by-Step AI Control Buttons */}
+                            <div className="flex flex-col gap-2 w-full mb-3">
+                               <div className="flex gap-2 w-full">
+                                  <button
+                                     type="button"
+                                     onClick={handleDeblurImage}
+                                     disabled={isDeblurring}
+                                     className="flex-1 py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                                  >
+                                     🔍 1. Debblur (NAFNet)
+                                  </button>
+                                  <button
+                                     type="button"
+                                     onClick={() => handleRemoveBgImage(deblurredImage || originalImage)}
+                                     disabled={isRemovingBg}
+                                     className="flex-1 py-2.5 px-3 bg-terracotta-600 hover:bg-terracotta-700 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                                  >
+                                     ✨ 2. Remove BG (White BG)
+                                  </button>
+                               </div>
+
+                               <button
+                                  type="button"
+                                  onClick={handleEnhanceImage}
+                                  disabled={isEnhancing}
+                                  className="w-full py-2.5 bg-earth-900 hover:bg-earth-800 text-white rounded-lg font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-md"
+                               >
+                                  ⚡ Full Pipeline: Debblur + White BG
+                               </button>
+                            </div>
+
+                            {/* Save / Reset Actions */}
+                            <div className="flex gap-2 w-full pt-2 border-t border-earth-200">
+                               <button 
+                                  type="button" 
+                                  onClick={() => { 
+                                     if (selectedImageFile) uploadImage(selectedImageFile, 'image');
+                                     setOriginalImage(null); 
+                                     setDeblurredImage(null);
+                                     setEnhancedImage(null);
+                                  }} 
+                                  className="flex-1 py-2.5 border border-earth-300 text-earth-700 rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-earth-50 transition-colors"
+                               >
+                                  Keep Original
+                               </button>
+                               <button 
+                                  type="button" 
+                                  onClick={() => { 
+                                     const bestImage = enhancedImage || deblurredImage;
+                                     if (bestImage) {
+                                       setNewProduct(p => ({ ...p, image: bestImage }));
+                                       if (bestImage.startsWith('data:')) {
+                                         try {
+                                           const arr = bestImage.split(',');
+                                           const mime = arr[0].match(/:(.*?);/)[1];
+                                           const bstr = atob(arr[1]);
+                                           let n = bstr.length;
+                                           const u8arr = new Uint8Array(n);
+                                           while(n--){
+                                               u8arr[n] = bstr.charCodeAt(n);
+                                           }
+                                           const file = new File([u8arr], "ai_enhanced_product.png", {type: mime});
+                                           uploadImage(file, 'image');
+                                         } catch (e) {
+                                           console.error(e);
                                          }
-                                         const file = new File([u8arr], "enhanced_product.png", {type: mime});
-                                         uploadImage(file, 'image');
-                                       } catch (e) {
-                                         console.error(e);
                                        }
                                      }
-                                   }
-                                   setOriginalImage(null); 
-                                   setEnhancedImage(null); 
-                               }} className="flex-1 py-3 bg-terracotta-600 text-white rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-terracotta-700 shadow-lg shadow-terracotta-900/20 transition-colors flex items-center justify-center gap-1.5"><CheckCircle2 size={16} /> Use Enhanced Image</button>
-                            </div>
-                            <button type="button" onClick={() => { setEnhancedImage(null); handleEnhanceImage(); }} className="mt-3 text-xs text-earth-500 hover:text-earth-700 underline transition-colors">Try Again</button>
-                         </div>
-                      ) : (
-                         <div className="flex flex-col items-center">
-                            <h3 className="font-bold text-earth-800 mb-3 flex items-center gap-2 text-sm">Image Preview</h3>
-                            <img src={originalImage} alt="selected" className="w-full h-44 object-contain bg-earth-50 rounded-lg border border-earth-200 mb-4" />
-                            <div className="flex flex-col sm:flex-row gap-3 w-full">
-                               <button type="button" onClick={() => { 
-                                   if (selectedImageFile) uploadImage(selectedImageFile, 'image');
-                                   setOriginalImage(null); 
-                               }} className="flex-1 py-3 border border-earth-300 text-earth-700 rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-earth-50 transition-colors">Keep Original</button>
-                               <button type="button" onClick={handleEnhanceImage} className="flex-1 py-3 bg-earth-900 text-white rounded-lg font-bold text-xs uppercase tracking-wider flex justify-center items-center gap-2 hover:bg-earth-800 shadow-md transition-colors"><Sparkles size={16} /> ✨ Improve Image</button>
+                                     setOriginalImage(null); 
+                                     setDeblurredImage(null);
+                                     setEnhancedImage(null); 
+                                  }} 
+                                  className="flex-1 py-2.5 bg-green-600 text-white rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-green-700 shadow-md transition-colors flex items-center justify-center gap-1.5"
+                               >
+                                  <CheckCircle2 size={16} /> Apply {enhancedImage ? "White BG" : deblurredImage ? "Deblurred" : "Photo"}
+                               </button>
                             </div>
                          </div>
                       )}
@@ -931,8 +1118,8 @@ const ProductFormModal = ({
                       )}
                     </div>
                     {newProduct.image && (
-                       <button type="button" onClick={handleEnhanceImage} className="w-full py-3 bg-earth-900 text-white rounded-lg font-bold flex items-center justify-center gap-2 shadow-md hover:bg-earth-800 transition-colors">
-                          <Sparkles size={18} /> ✨ Improve Photo
+                       <button type="button" onClick={() => setOriginalImage(newProduct.image)} className="w-full py-3 bg-earth-900 text-white rounded-lg font-bold flex items-center justify-center gap-2 shadow-md hover:bg-earth-800 transition-colors">
+                          <Sparkles size={18} /> ✨ AI Image Studio (Debblur / White BG)
                        </button>
                     )}
                   </div>

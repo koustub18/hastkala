@@ -8,3 +8,5 @@ backend/venv/
 ai-service/.env
 backend/.env
 apps/web/.env
+*.onnx
+ai-service/static/

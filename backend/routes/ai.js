@@ -174,6 +174,7 @@ router.post('/enhance', imageLimiter, (req, res) => {
         success: true,
         image_url: data.image_url ? `${aiServiceUrl}${data.image_url}` : null,
         base64Image: data.base64Image || (data.base64_image ? data.base64_image.replace(/^data:image\/png;base64,/, '') : null),
+        base64_image: data.base64_image,
         mimeType: data.mimeType || 'image/png',
         message: data.message || 'Background removed successfully using BRIA RMBG-2.0'
       });
@@ -181,6 +182,72 @@ router.post('/enhance', imageLimiter, (req, res) => {
     } catch (error) {
       console.error('AI Enhancement Error:', error);
       res.status(500).json({ success: false, error: "We couldn't improve this image right now. Please try another image." });
+    }
+  });
+});
+
+router.post('/deblur', imageLimiter, (req, res) => {
+  uploadEnhance(req, res, async (err) => {
+    if (err) return res.status(400).json({ success: false, error: err.message });
+    try {
+      if (!req.file) return res.status(400).json({ success: false, error: 'Image file is required.' });
+
+      const aiServiceUrl = process.env.ASR_API_URL || 'http://localhost:8000';
+      const formData = new FormData();
+      const fileBlob = new Blob([req.file.buffer], { type: req.file.mimetype || 'image/jpeg' });
+      formData.append('file', fileBlob, req.file.originalname || 'image.jpg');
+
+      const response = await fetch(`${aiServiceUrl}/api/deblur`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error(`AI Service returned ${response.status}`);
+      const data = await response.json();
+      return res.status(200).json({
+        success: true,
+        image_url: data.image_url ? `${aiServiceUrl}${data.image_url}` : null,
+        base64Image: data.base64Image,
+        base64_image: data.base64_image,
+        mimeType: data.mimeType || 'image/png',
+        message: data.message || 'Image deblurred successfully using NAFNet'
+      });
+    } catch (error) {
+      console.error('Debblur Proxy Error:', error);
+      res.status(500).json({ success: false, error: "Failed to deblur image." });
+    }
+  });
+});
+
+router.post('/remove-bg', imageLimiter, (req, res) => {
+  uploadEnhance(req, res, async (err) => {
+    if (err) return res.status(400).json({ success: false, error: err.message });
+    try {
+      if (!req.file) return res.status(400).json({ success: false, error: 'Image file is required.' });
+
+      const aiServiceUrl = process.env.ASR_API_URL || 'http://localhost:8000';
+      const formData = new FormData();
+      const fileBlob = new Blob([req.file.buffer], { type: req.file.mimetype || 'image/jpeg' });
+      formData.append('file', fileBlob, req.file.originalname || 'image.jpg');
+
+      const response = await fetch(`${aiServiceUrl}/api/remove-bg`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error(`AI Service returned ${response.status}`);
+      const data = await response.json();
+      return res.status(200).json({
+        success: true,
+        image_url: data.image_url ? `${aiServiceUrl}${data.image_url}` : null,
+        base64Image: data.base64Image,
+        base64_image: data.base64_image,
+        mimeType: data.mimeType || 'image/png',
+        message: data.message || 'Background removed with clean white background'
+      });
+    } catch (error) {
+      console.error('Remove BG Proxy Error:', error);
+      res.status(500).json({ success: false, error: "Failed to remove background." });
     }
   });
 });

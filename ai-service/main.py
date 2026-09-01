@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 import dotenv
 
 from image_service import BriaRMBG2Service, ImageEnhancementPipeline
+from deblur.deblur_service import NAFNetDebblurService
 
 dotenv.load_dotenv()
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
@@ -30,7 +31,8 @@ processor_instance = None
 device = "cpu"
 
 rmbg_service = BriaRMBG2Service()
-image_pipeline = ImageEnhancementPipeline(rmbg_service)
+deblur_service = NAFNetDebblurService()
+image_pipeline = ImageEnhancementPipeline(rmbg_service, deblur_service)
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "static", "enhanced")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -121,6 +123,15 @@ async def load_rmbg_model_async():
             logger.error(f"Error during RMBG startup load: {rmbg_err}")
     await asyncio.to_thread(_load)
 
+async def load_deblur_model_async():
+    import asyncio
+    def _load():
+        try:
+            deblur_service.load_model()
+        except Exception as deblur_err:
+            logger.error(f"Error during NAFNet Debblur startup load: {deblur_err}")
+    await asyncio.to_thread(_load)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global device
@@ -133,13 +144,14 @@ async def lifespan(app: FastAPI):
     # Launch model loading in background tasks so server binds port 8000 immediately
     asyncio.create_task(load_asr_model_async())
     asyncio.create_task(load_rmbg_model_async())
+    asyncio.create_task(load_deblur_model_async())
 
     yield
     logger.info("Shutting down ASR & Image Enhancement service.")
 
 
 app = FastAPI(
-    title="CraftAI IndicConformer & BRIA RMBG-2.0 Service",
+    title="CraftAI IndicConformer, NAFNet Deblur & BRIA RMBG-2.0 Service",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -158,26 +170,117 @@ async def health_check():
     current_device = "cuda" if torch.cuda.is_available() else "cpu"
     is_ready = model_instance is not None
     rmbg_ready = rmbg_service.is_ready()
+    deblur_ready = deblur_service.is_ready()
     return {
         "status": "ok",
         "model": MODEL_NAME,
         "rmbg_model": rmbg_service.model_name,
+        "deblur_model": "NAFNet-ONNX",
         "device": current_device,
         "ready": is_ready,
         "rmbg_ready": rmbg_ready,
-        "note": "Ready for IndicConformer & BRIA RMBG-2.0 inference"
+        "deblur_ready": deblur_ready,
+        "note": "Ready for IndicConformer, NAFNet Deblur & BRIA RMBG-2.0 inference"
     }
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/jpg"}
 MAX_IMAGE_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
+@app.post("/api/deblur")
+@app.post("/api/deblur-image")
+async def deblur_image_endpoint(
+    file: UploadFile = File(None),
+    image_file: UploadFile = File(None)
+):
+    """Step 1: Deblur input image using local NAFNet ONNX model."""
+    upload = file or image_file
+    if not upload:
+        raise HTTPException(status_code=400, detail="Image file is required (form parameter 'file' or 'image_file').")
+
+    try:
+        contents = await upload.read()
+        if len(contents) == 0:
+            raise HTTPException(status_code=400, detail="Uploaded image file is empty.")
+
+        input_image = Image.open(io.BytesIO(contents))
+        output_image = image_pipeline.deblur_image(input_image)
+
+        file_id = f"deblurred_{uuid.uuid4().hex[:12]}.png"
+        file_path = os.path.join(UPLOAD_DIR, file_id)
+        output_image.save(file_path, "PNG")
+
+        buffer = io.BytesIO()
+        output_image.save(buffer, format="PNG")
+        base64_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        image_url = f"/api/image/{file_id}"
+
+        return JSONResponse({
+            "success": True,
+            "image_url": image_url,
+            "filename": file_id,
+            "mimeType": "image/png",
+            "base64Image": base64_str,
+            "base64_image": f"data:image/png;base64,{base64_str}",
+            "message": "Image deblurred successfully using NAFNet!"
+        })
+    except HTTPException:
+        raise
+    except Exception as err:
+        logger.error(f"Debblurring error: {err}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to deblur image. Please try again.")
+
+@app.post("/api/remove-bg")
+@app.post("/api/removebg")
+async def remove_bg_endpoint(
+    file: UploadFile = File(None),
+    image_file: UploadFile = File(None)
+):
+    """Step 2: Remove background from image and composite with clean white background."""
+    upload = file or image_file
+    if not upload:
+        raise HTTPException(status_code=400, detail="Image file is required (form parameter 'file' or 'image_file').")
+
+    try:
+        contents = await upload.read()
+        if len(contents) == 0:
+            raise HTTPException(status_code=400, detail="Uploaded image file is empty.")
+
+        input_image = Image.open(io.BytesIO(contents))
+        output_image = image_pipeline.remove_background(input_image, add_white_bg=True)
+
+        file_id = f"removebg_{uuid.uuid4().hex[:12]}.png"
+        file_path = os.path.join(UPLOAD_DIR, file_id)
+        output_image.save(file_path, "PNG")
+
+        buffer = io.BytesIO()
+        output_image.save(buffer, format="PNG")
+        base64_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        image_url = f"/api/image/{file_id}"
+
+        return JSONResponse({
+            "success": True,
+            "image_url": image_url,
+            "filename": file_id,
+            "mimeType": "image/png",
+            "base64Image": base64_str,
+            "base64_image": f"data:image/png;base64,{base64_str}",
+            "message": "Background removed successfully with clean white background!"
+        })
+    except HTTPException:
+        raise
+    except Exception as err:
+        logger.error(f"Remove BG error: {err}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to remove background. Please try again.")
+
 @app.post("/api/improve-image")
 @app.post("/api/ai/enhance")
 @app.post("/api/enhance")
+@app.post("/api/deblur-and-removebg")
 async def improve_image(
     file: UploadFile = File(None),
     image_file: UploadFile = File(None)
 ):
+    """Full Sequential Pipeline: Debblur (NAFNet) -> Remove Background (RMBG-2.0) -> White Background overlay."""
     upload = file or image_file
     if not upload:
         raise HTTPException(status_code=400, detail="Image file is required (form parameter 'file' or 'image_file').")
@@ -197,7 +300,7 @@ async def improve_image(
 
         input_image = Image.open(io.BytesIO(contents))
         
-        # Execute BRIA RMBG-2.0 Image Enhancement Pipeline
+        # Execute sequential pipeline: Debblur -> Remove BG -> White Background
         output_image = image_pipeline.process_product_image(input_image)
         
         file_id = f"enhanced_{uuid.uuid4().hex[:12]}.png"
@@ -217,7 +320,7 @@ async def improve_image(
             "mimeType": "image/png",
             "base64Image": base64_str,
             "base64_image": f"data:image/png;base64,{base64_str}",
-            "message": "Background removed successfully using BRIA RMBG-2.0"
+            "message": "Image deblurred, background removed, and white background applied successfully!"
         })
         
     except HTTPException:
