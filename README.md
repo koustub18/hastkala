@@ -47,18 +47,65 @@ HastKala empowers traditional Indian artisans by providing a voice-first digital
 ## 🏗️ System Architecture & Workflow
 
 ```mermaid
-flowchart LR
-    A[React/Expo Client] -->|Auth & DB| B[(Firebase)]
-    A -->|Media Uploads| C[Node.js Express Gateway]
-    C -->|Proxy API| D[Python FastAPI Service]
-    
-    subgraph AI Microservice
-        D --> E[Voice Pipeline: ASR ➔ MyMemory ➔ Groq]
-        D --> F[Image Pipeline: NAFNet ➔ OpenCV ➔ RMBG-2.0]
+flowchart TD
+    subgraph Client ["Client Layer"]
+        User["Artisan / Customer"]
+        Cam["WebRTC Camera & Microphones"]
+        WebApp["React 19 + Vite Frontend (@hastkala/web)"]
+        User --> WebApp
+        Cam --> WebApp
     end
+
+    subgraph Storage ["Database & External Services"]
+        Firestore[("Firebase Firestore (Products, Users, Impressions)")]
+        FirebaseAuth["Firebase Auth"]
+        MongoDB[("MongoDB / Mongoose (Legacy Store)")]
+    end
+
+    subgraph Gateway ["Backend Gateway"]
+        NodeServer["Node.js + Express Server (backend/)"]
+        AuthMiddleware["Firebase Auth Verification"]
+        APIRoutes["Express API Proxy Routes (/api/ai)"]
+        NodeServer --> AuthMiddleware
+        NodeServer --> APIRoutes
+    end
+
+    subgraph AIService ["AI Microservice (ai-service/)"]
+        FastAPI["FastAPI App (Python 3.10)"]
+        
+        subgraph VoicePipe ["ASR & NLP Pipeline"]
+            ASR["IndicConformer / Whisper ASR"]
+            Translation["MyMemory Translation"]
+            LLM["Groq / Gemini Field Extraction"]
+            ASR --> Translation
+            Translation --> LLM
+        end
+
+        subgraph ImgPipe ["3-Stage Image Enhancement Pipeline"]
+            NAFNet["Stage 1: NAFNet Deblur (ONNX)"]
+            LABEngine["Stage 2: OpenCV LAB Adaptive Lighting"]
+            RMBG["Stage 3: BRIA RMBG-2.0 (ONNX White BG)"]
+            NAFNet --> LABEngine
+            LABEngine --> RMBG
+        end
+
+        subgraph PricingPipe ["Price Prediction"]
+            PricingMLP["PyTorch MLP Pricing Model"]
+        end
+
+        FastAPI --> ASR
+        FastAPI --> NAFNet
+        FastAPI --> PricingMLP
+    end
+
+    WebApp -->|Client Auth & State| Firestore
+    WebApp -->|Authentication| FirebaseAuth
+    WebApp -->|REST API Requests| NodeServer
     
-    E --> A
-    F --> A
+    NodeServer --> Firestore
+    NodeServer --> MongoDB
+    
+    APIRoutes -->|Multipart / Form-Data| FastAPI
 ```
 
 **Workflow:**
