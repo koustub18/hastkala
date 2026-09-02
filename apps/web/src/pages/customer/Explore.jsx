@@ -1,15 +1,17 @@
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Filter, ShoppingBag, Heart, X, ChevronDown } from 'lucide-react';
+import { Search, Filter, ShoppingBag, Heart, X, ChevronDown, MapPin } from 'lucide-react';
 import { useProducts } from '../../hooks/useProducts';
 import { resolveImageUrl } from '../../utils/webImageUtils';
+import { INDIAN_STATES, extractOriginState } from '../../data/indianStates';
 
 const Explore = () => {
   const { products, isLoading, error } = useProducts();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedMaterial, setSelectedMaterial] = useState('All');
+  const [selectedState, setSelectedState] = useState('All');
   const [priceRange, setPriceRange] = useState({ min: '', max: '' });
   const [sortBy, setSortBy] = useState('Newest');
   const [showFilters, setShowFilters] = useState(false);
@@ -38,12 +40,15 @@ const Explore = () => {
       const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
       const matchesMaterial = selectedMaterial === 'All' || product.material === selectedMaterial;
       
+      const originState = extractOriginState(product);
+      const matchesState = selectedState === 'All' || originState.toLowerCase() === selectedState.toLowerCase();
+
       const minP = priceRange.min ? parseFloat(priceRange.min) : 0;
       const maxP = priceRange.max ? parseFloat(priceRange.max) : Infinity;
       const prodPrice = parseFloat(product.price) || 0;
       const matchesPrice = prodPrice >= minP && prodPrice <= maxP;
 
-      return matchesSearch && matchesCategory && matchesMaterial && matchesPrice;
+      return matchesSearch && matchesCategory && matchesMaterial && matchesPrice && matchesState;
     }).sort((a, b) => {
       const priceA = parseFloat(a.price) || 0;
       const priceB = parseFloat(b.price) || 0;
@@ -56,17 +61,18 @@ const Explore = () => {
       const dateB = b.createdAt?.toMillis?.() || new Date(b.createdAt || 0).getTime();
       return dateB - dateA;
     });
-  }, [products, searchTerm, selectedCategory, selectedMaterial, priceRange, sortBy]);
+  }, [products, searchTerm, selectedCategory, selectedMaterial, selectedState, priceRange, sortBy]);
 
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedCategory('All');
     setSelectedMaterial('All');
+    setSelectedState('All');
     setPriceRange({ min: '', max: '' });
     setSortBy('Newest');
   };
 
-  const hasActiveFilters = searchTerm || selectedCategory !== 'All' || selectedMaterial !== 'All' || priceRange.min || priceRange.max || sortBy !== 'Newest';
+  const hasActiveFilters = searchTerm || selectedCategory !== 'All' || selectedMaterial !== 'All' || selectedState !== 'All' || priceRange.min || priceRange.max || sortBy !== 'Newest';
 
   if (error) {
     return (
@@ -144,7 +150,22 @@ const Explore = () => {
                 exit={{ height: 0, opacity: 0 }}
                 className="overflow-hidden"
               >
-                <div className="pt-6 mt-4 border-t border-earth-100 grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="pt-6 mt-4 border-t border-earth-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                  {/* Origin State Filter */}
+                  <div>
+                    <label className="block text-xs font-bold text-earth-500 uppercase tracking-wider mb-2">Origin State</label>
+                    <div className="relative">
+                      <select 
+                        value={selectedState}
+                        onChange={(e) => setSelectedState(e.target.value)}
+                        className="w-full appearance-none bg-earth-50 border border-earth-200 text-earth-900 text-sm rounded-lg focus:ring-terracotta-500 focus:border-terracotta-500 block p-2.5 outline-none font-medium"
+                      >
+                        <option value="All">All States</option>
+                        {INDIAN_STATES.map(st => <option key={st} value={st}>{st}</option>)}
+                      </select>
+                      <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-earth-400 pointer-events-none" />
+                    </div>
+                  </div>
                   {/* Category Dropdown (if many) */}
                   <div>
                     <label className="block text-xs font-bold text-earth-500 uppercase tracking-wider mb-2">Category</label>
@@ -273,9 +294,27 @@ const Explore = () => {
                   </div>
                   <div className="p-5 flex flex-col flex-1">
                     <h3 className="font-semibold text-lg text-earth-900 mb-1 line-clamp-1">{product.title}</h3>
-                    <p className="text-sm text-earth-600 mb-3 line-clamp-1">By {product.artisanName || product.artisan || 'Artisan'}</p>
-                    <div className="mt-auto flex items-center justify-between">
-                      <span className="text-forest-700 font-bold text-lg">{product.price ? `₹${product.price}` : 'Price on request'}</span>
+                    <div className="flex items-center justify-between gap-1 mb-3 text-sm text-earth-600">
+                      <span className="line-clamp-1">By {product.artisanName || product.artisan || 'Artisan'}</span>
+                      {extractOriginState(product) && (
+                        <span className="shrink-0 flex items-center gap-1 text-[11px] font-bold text-terracotta-700 bg-terracotta-50 px-2 py-0.5 rounded-full border border-terracotta-200/50">
+                          <MapPin size={11} className="text-terracotta-600" /> {extractOriginState(product)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-auto pt-2 flex items-center justify-between border-t border-earth-100/60">
+                      <div className="flex flex-col">
+                        <span className="text-forest-700 font-bold text-lg">{product.price ? `₹${product.price}` : 'Price on request'}</span>
+                        <div className="text-[11px] font-medium">
+                          {product.stockQuantity === 0 ? (
+                            <span className="text-red-600 font-bold">📦 OUT OF STOCK</span>
+                          ) : product.stockQuantity > 0 ? (
+                            <span className="text-earth-600">📦 Available: {product.stockQuantity}</span>
+                          ) : (
+                            <span className="text-earth-400">📦 Stock not available</span>
+                          )}
+                        </div>
+                      </div>
                       <div className="text-terracotta-600 hover:bg-terracotta-50 p-2 rounded-full transition-colors">
                         <Heart size={20} />
                       </div>

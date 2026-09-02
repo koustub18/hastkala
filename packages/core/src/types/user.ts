@@ -34,5 +34,8 @@ export interface User {
   pincode?: string;
   upiId?: string;
   phone?: string;
+  profileImage?: string;
+  coverImage?: string;
+  updatedAt?: Timestamp | string | null;
   verification?: VerificationDetails;
 }

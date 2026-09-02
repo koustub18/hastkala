@@ -1,4 +1,4 @@
-import { doc, getDoc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { db } from '../utils/firebase';
 import { User } from '../types/user';
 
@@ -45,3 +45,19 @@ export const submitOnboarding = async (uid: string, data: Record<string, any>): 
     }
   });
 };
+
+export const updateArtisanProfileImages = async (
+  uid: string,
+  data: { profileImage?: string; coverImage?: string }
+): Promise<void> => {
+  if (!uid) return;
+  const userRef = doc(db, 'users', uid);
+  const updatePayload: Record<string, any> = {
+    updatedAt: serverTimestamp()
+  };
+  if (data.profileImage !== undefined) updatePayload.profileImage = data.profileImage;
+  if (data.coverImage !== undefined) updatePayload.coverImage = data.coverImage;
+
+  await setDoc(userRef, updatePayload, { merge: true });
+};
+

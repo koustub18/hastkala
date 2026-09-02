@@ -45,8 +45,8 @@ export default {
         }
       },
       fontFamily: {
-        'sans': ['Inter', 'ui-sans-serif', 'system-ui'],
-        'serif': ['Cinzel', 'ui-serif', 'Georgia'],
+        'sans': ['"DM Sans"', 'Inter', 'ui-sans-serif', 'system-ui'],
+        'serif': ['"Cormorant Garamond"', 'Cinzel', 'Georgia', 'ui-serif', 'serif'],
       }
     },
   },

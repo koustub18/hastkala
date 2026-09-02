@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { auth } from '@hastkala/core';
 import toast from 'react-hot-toast';
-import { CheckCircle, XCircle, Clock, MapPin, Store, CreditCard, ChevronDown, ChevronUp, Search, Filter } from 'lucide-react';
+import { 
+  CheckCircle, XCircle, Clock, MapPin, Store, Eye, Search, Filter, ShieldCheck, UserCheck 
+} from 'lucide-react';
 import { getSafeMillis, getSafeDate } from '@hastkala/core';
 import { getPendingArtisans, approveArtisan, rejectArtisan, getActiveArtisans } from '@hastkala/core';
+import ArtisanReviewModal from '../../components/admin/ArtisanReviewModal';
 
 const AdminApplications = () => {
   const [artisans, setArtisans] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [expandedId, setExpandedId] = useState(null);
-  const [actionLoading, setActionLoading] = useState(null);
   const [activeTab, setActiveTab] = useState('pending'); // pending, active, rejected
-  const [rejectionState, setRejectionState] = useState({ isOpen: false, artisanId: null, reason: '' });
+  const [selectedArtisanForReview, setSelectedArtisanForReview] = useState(null);
+  const [actionLoading, setActionLoading] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const fetchArtisans = async () => {
     setLoading(true);
@@ -43,9 +45,9 @@ const AdminApplications = () => {
     setActionLoading(artisanId);
     try {
       await approveArtisan(artisanId);
-      
       toast.success('Artisan approved successfully!');
-      fetchArtisans();
+      setSelectedArtisanForReview(null);
+      await fetchArtisans();
     } catch (error) {
       console.error('Error approving artisan:', error);
       toast.error('Failed to approve artisan');
@@ -54,23 +56,13 @@ const AdminApplications = () => {
     }
   };
 
-  const handleRejectClick = (artisanId) => {
-    setRejectionState({ isOpen: true, artisanId, reason: '' });
-  };
-
-  const confirmReject = async () => {
-    if (!rejectionState.reason) {
-      toast.error('Please enter a rejection reason.');
-      return;
-    }
-    
-    setActionLoading(rejectionState.artisanId);
+  const handleReject = async (artisanId, reason) => {
+    setActionLoading(artisanId);
     try {
-      await rejectArtisan(rejectionState.artisanId, rejectionState.reason || 'Does not meet our community standards.');
-      
-      toast.success('Artisan rejected.');
-      setRejectionState({ isOpen: false, artisanId: null, reason: '' });
-      fetchArtisans();
+      await rejectArtisan(artisanId, reason || 'Does not meet our community standards.');
+      toast.success('Artisan application rejected.');
+      setSelectedArtisanForReview(null);
+      await fetchArtisans();
     } catch (error) {
       console.error('Error rejecting artisan:', error);
       toast.error('Failed to reject artisan');
@@ -79,207 +71,185 @@ const AdminApplications = () => {
     }
   };
 
-  const toggleExpand = (id) => {
-    setExpandedId(expandedId === id ? null : id);
-  };
+  const filteredArtisans = artisans.filter(a => {
+    const matchesStatus = a.status === activeTab;
+    const searchLower = searchTerm.toLowerCase().trim();
+    const matchesSearch = !searchLower || 
+      a.name?.toLowerCase().includes(searchLower) || 
+      a.email?.toLowerCase().includes(searchLower) || 
+      a.specialty?.toLowerCase().includes(searchLower) ||
+      a.location?.toLowerCase().includes(searchLower);
 
-  const filteredArtisans = artisans.filter(a => a.status === activeTab);
+    return matchesStatus && matchesSearch;
+  });
 
   const getStatusBadge = (status) => {
     switch(status) {
-      case 'pending': return <span className="px-2 py-1 bg-yellow-50 text-yellow-700 text-xs font-bold uppercase tracking-wider rounded border border-yellow-200 flex items-center gap-1"><Clock size={12}/> Pending</span>;
-      case 'active': return <span className="px-2 py-1 bg-forest-50 text-forest-700 text-xs font-bold uppercase tracking-wider rounded border border-forest-200 flex items-center gap-1"><CheckCircle size={12}/> Approved</span>;
-      case 'rejected': return <span className="px-2 py-1 bg-red-50 text-red-700 text-xs font-bold uppercase tracking-wider rounded border border-red-200 flex items-center gap-1"><XCircle size={12}/> Rejected</span>;
+      case 'pending': 
+        return (
+          <span className="px-3 py-1 bg-yellow-50 text-yellow-700 text-xs font-bold uppercase tracking-wider rounded-full border border-yellow-200 flex items-center gap-1">
+            <Clock size={13} /> Pending Review
+          </span>
+        );
+      case 'active': 
+        return (
+          <span className="px-3 py-1 bg-forest-50 text-forest-700 text-xs font-bold uppercase tracking-wider rounded-full border border-forest-200 flex items-center gap-1">
+            <CheckCircle size={13} /> Verified
+          </span>
+        );
+      case 'rejected': 
+        return (
+          <span className="px-3 py-1 bg-red-50 text-red-700 text-xs font-bold uppercase tracking-wider rounded-full border border-red-200 flex items-center gap-1">
+            <XCircle size={13} /> Rejected
+          </span>
+        );
       default: return null;
     }
   };
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-earth-200 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
+      
+      {/* Header Banner */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-earth-200 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-serif font-bold text-earth-900 mb-2">Artisan Applications</h2>
-          <p className="text-earth-500 text-sm">Review and manage artisan onboarding applications.</p>
+          <div className="flex items-center gap-2 mb-1">
+            <ShieldCheck className="text-terracotta-600" size={24} />
+            <h2 className="text-2xl font-serif font-bold text-earth-900">ARTISAN VERIFICATION</h2>
+          </div>
+          <p className="text-earth-500 text-sm">
+            Manually review artisan onboarding details and uploaded identity documents before approving or rejecting.
+          </p>
         </div>
         
-        <div className="flex border border-earth-200 rounded-lg overflow-hidden bg-earth-50 p-1">
-          {['pending', 'active', 'rejected'].map(tab => (
-            <button
-              key={tab}
-              onClick={() => { setActiveTab(tab); setExpandedId(null); }}
-              className={`px-4 py-2 text-sm font-medium rounded-md capitalize transition-colors ${activeTab === tab ? 'bg-white shadow-sm text-earth-900 border border-earth-200' : 'text-earth-500 hover:text-earth-700'}`}
-            >
-              {tab}
-            </button>
-          ))}
+        {/* Status Filter Tabs */}
+        <div className="flex border border-earth-200 rounded-xl overflow-hidden bg-earth-50 p-1 shrink-0">
+          {['pending', 'active', 'rejected'].map(tab => {
+            const count = artisans.filter(a => a.status === tab).length;
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 text-xs font-sans font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-2 ${
+                  activeTab === tab 
+                    ? 'bg-white shadow-sm text-earth-900 border border-earth-200' 
+                    : 'text-earth-500 hover:text-earth-800'
+                }`}
+              >
+                <span className="capitalize">{tab}</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+                  activeTab === tab ? 'bg-terracotta-100 text-terracotta-700' : 'bg-earth-200 text-earth-600'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
+      {/* Search Input Bar */}
+      <div className="bg-white p-4 rounded-xl border border-earth-200 shadow-sm flex items-center gap-3">
+        <Search size={18} className="text-earth-400 shrink-0" />
+        <input
+          type="text"
+          placeholder="Search artisan by name, email, specialty, or location..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full text-sm outline-none bg-transparent text-earth-900 placeholder-earth-400"
+        />
+        {searchTerm && (
+          <button onClick={() => setSearchTerm('')} className="text-xs text-earth-400 hover:text-earth-700">Clear</button>
+        )}
+      </div>
+
+      {/* Applications List */}
       {loading ? (
-        <div className="flex items-center justify-center h-64">
+        <div className="flex items-center justify-center h-64 bg-white rounded-2xl border border-earth-200">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-terracotta-600"></div>
         </div>
       ) : filteredArtisans.length === 0 ? (
-        <div className="bg-white p-12 rounded-xl shadow-sm border border-earth-200 text-center">
-          <div className="w-16 h-16 bg-earth-100 text-earth-400 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Search size={24} />
-          </div>
-          <h3 className="text-lg font-bold text-earth-900 mb-2">No {activeTab} applications</h3>
-          <p className="text-earth-500">There are no applications matching this status.</p>
+        <div className="bg-white p-12 rounded-2xl shadow-sm border border-earth-200 text-center">
+          <UserCheck size={36} className="mx-auto text-earth-400 mb-3" />
+          <h3 className="text-lg font-serif font-bold text-earth-900 mb-1">No {activeTab} artisans found</h3>
+          <p className="text-earth-500 text-sm">
+            {searchTerm ? 'Try adjusting your search criteria.' : `There are no ${activeTab} artisan applications to review.`}
+          </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {filteredArtisans.map(artisan => (
-            <div key={artisan.id} className="bg-white rounded-xl shadow-sm border border-earth-200 overflow-hidden">
+        <div className="grid grid-cols-1 gap-4">
+          {filteredArtisans.map(artisan => {
+            const dateObj = artisan.verification?.submittedAt || artisan.createdAt;
+            const formattedDate = dateObj && getSafeDate(dateObj) 
+              ? getSafeDate(dateObj).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+              : 'Recently';
+
+            return (
               <div 
-                className="p-5 flex flex-col md:flex-row md:items-center justify-between cursor-pointer hover:bg-earth-50 transition-colors gap-4"
-                onClick={() => toggleExpand(artisan.id)}
+                key={artisan.id} 
+                className="bg-white rounded-2xl p-5 shadow-sm border border-earth-200 hover:border-earth-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-5 group"
               >
+                {/* Artisan Summary Info */}
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-earth-100 flex items-center justify-center text-earth-700 font-serif font-bold text-lg uppercase shrink-0">
-                    {artisan.name?.charAt(0) || 'A'}
+                  <div className="w-14 h-14 rounded-full bg-earth-100 border border-earth-200 overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
+                    {artisan.profileImage ? (
+                      <img src={artisan.profileImage} alt={artisan.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="font-serif font-bold text-xl text-earth-700 uppercase">
+                        {artisan.name?.charAt(0) || 'A'}
+                      </span>
+                    )}
                   </div>
+
                   <div>
-                    <h3 className="font-bold text-earth-900">{artisan.name || 'Not provided'}</h3>
-                    <div className="flex items-center gap-3 text-sm text-earth-500 mt-1">
-                      <span className="flex items-center gap-1"><Store size={14} /> {artisan.specialty || 'Not provided'}</span>
-                      <span className="flex items-center gap-1"><MapPin size={14} /> {artisan.location || 'Not provided'}</span>
+                    <div className="flex items-center gap-2.5 mb-1">
+                      <h3 className="font-serif text-lg font-bold text-earth-900">{artisan.name || 'Unnamed Artisan'}</h3>
+                      {getStatusBadge(artisan.status)}
                     </div>
+                    
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-earth-500">
+                      <span className="flex items-center gap-1">
+                        <Store size={13} className="text-terracotta-600" /> {artisan.specialty || 'General Craft'}
+                      </span>
+                      <span>•</span>
+                      <span className="flex items-center gap-1">
+                        <MapPin size={13} className="text-earth-400" /> {artisan.location || 'Location not set'}
+                      </span>
+                      <span>•</span>
+                      <span>Applied: {formattedDate}</span>
+                    </div>
+
+                    <p className="text-xs text-earth-400 font-mono mt-1">
+                      {artisan.email || 'No Email'} {artisan.phone ? `• ${artisan.phone}` : ''}
+                    </p>
                   </div>
                 </div>
-                
-                <div className="flex items-center gap-4 self-start md:self-auto ml-16 md:ml-0">
-                  {getStatusBadge(artisan.status)}
-                  <button className="text-earth-400 hover:text-earth-700 p-1">
-                    {expandedId === artisan.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+
+                {/* Primary Action Button: REVIEW */}
+                <div className="shrink-0 flex items-center gap-3 border-t md:border-t-0 pt-3 md:pt-0 border-earth-100">
+                  <button
+                    onClick={() => setSelectedArtisanForReview(artisan)}
+                    className="w-full md:w-auto bg-earth-900 hover:bg-earth-800 text-white font-sans font-bold text-xs uppercase tracking-wider px-6 py-3 rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2"
+                  >
+                    <Eye size={16} /> REVIEW APPLICATION
                   </button>
                 </div>
               </div>
-
-              {expandedId === artisan.id && (
-                <div className="border-t border-earth-100 p-5 bg-earth-50/50">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
-                    <div className="space-y-4">
-                      <div>
-                        <h4 className="text-xs font-bold text-earth-400 uppercase tracking-wider mb-3">Artisan Details</h4>
-                        <div className="bg-white p-4 rounded border border-earth-200 space-y-3">
-                          <div><span className="text-xs text-earth-500 block mb-1">Full Name</span><span className="font-medium text-earth-900">{artisan.name || 'Not provided'}</span></div>
-                          <div><span className="text-xs text-earth-500 block mb-1">Email Address</span><span className="font-medium text-earth-900">{artisan.email || 'Not provided'}</span></div>
-                          <div><span className="text-xs text-earth-500 block mb-1">Phone Number</span><span className="font-medium text-earth-900">{artisan.phone || 'Not provided'}</span></div>
-                          { (artisan.verification?.submittedAt || artisan.createdAt) && getSafeDate(artisan.verification?.submittedAt || artisan.createdAt) && (
-                            <div><span className="text-xs text-earth-500 block mb-1">Applied On</span><span className="font-medium text-earth-900">{getSafeDate(artisan.verification?.submittedAt || artisan.createdAt).toLocaleString()}</span></div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      <div>
-                        <h4 className="text-xs font-bold text-earth-400 uppercase tracking-wider mb-3">Business Details</h4>
-                        <div className="bg-white p-4 rounded border border-earth-200 space-y-3">
-                          <div><span className="text-xs text-earth-500 block mb-1">Craft Specialty</span><span className="font-medium text-earth-900">{artisan.specialty || 'Not provided'}</span></div>
-                          <div><span className="text-xs text-earth-500 block mb-1">Location</span><span className="font-medium text-earth-900">{artisan.location || 'Not provided'}</span></div>
-                          <div>
-                            <span className="text-xs text-earth-500 block mb-1">UPI ID (For Payments)</span>
-                            <div className="flex items-center gap-2"><CreditCard size={14} className="text-earth-400" /><span className="font-medium text-earth-900">{artisan.upiId || 'Not provided'}</span></div>
-                          </div>
-                          {artisan.verification?.rejectionReason && (
-                            <div className="p-3 bg-red-50 text-red-800 text-sm rounded border border-red-100">
-                              <span className="font-bold block mb-1">Rejection Reason:</span>
-                              {artisan.verification.rejectionReason}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {artisan.verification?.documents && (
-                    <div className="mt-6 border-t border-earth-100 pt-6">
-                      <h4 className="text-xs font-bold text-earth-400 uppercase tracking-wider mb-3">Verification Documents</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {artisan.verification.documents.identity && (
-                          <div className="bg-white p-3 rounded border border-earth-200">
-                            <span className="text-xs text-earth-500 block mb-2 font-bold">Government ID</span>
-                            <a href={artisan.verification.documents.identity} target="_blank" rel="noopener noreferrer">
-                              <img src={artisan.verification.documents.identity} alt="Gov ID" className="w-full h-32 object-cover rounded border border-earth-100 hover:opacity-80 transition-opacity" />
-                            </a>
-                          </div>
-                        )}
-                        {artisan.verification.documents.profilePhoto && (
-                          <div className="bg-white p-3 rounded border border-earth-200">
-                            <span className="text-xs text-earth-500 block mb-2 font-bold">Profile Photo</span>
-                            <a href={artisan.verification.documents.profilePhoto} target="_blank" rel="noopener noreferrer">
-                              <img src={artisan.verification.documents.profilePhoto} alt="Profile" className="w-full h-32 object-cover rounded border border-earth-100 hover:opacity-80 transition-opacity" />
-                            </a>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex gap-3 justify-end pt-4 border-t border-earth-200 mt-6">
-                    {activeTab === 'pending' && (
-                      <>
-                        <button
-                          onClick={() => handleRejectClick(artisan.id)}
-                          disabled={actionLoading === artisan.id} className="px-4 py-2 border border-red-200 text-red-600 font-medium rounded hover:bg-red-50 flex items-center gap-2 disabled:opacity-50">
-                          <XCircle size={16} /> Reject
-                        </button>
-                        <button onClick={() => handleApprove(artisan.id)} disabled={actionLoading === artisan.id} className="px-6 py-2 bg-forest-600 text-white font-medium rounded hover:bg-forest-700 flex items-center gap-2 disabled:opacity-50">
-                          {actionLoading === artisan.id ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : <CheckCircle size={16} />}
-                          Approve
-                        </button>
-                      </>
-                    )}
-                    {activeTab === 'active' && (
-                      <button onClick={() => handleRejectClick(artisan.id)} disabled={actionLoading === artisan.id} className="px-4 py-2 border border-red-200 text-red-600 font-medium rounded hover:bg-red-50 flex items-center gap-2 disabled:opacity-50">
-                        Revoke Approval
-                      </button>
-                    )}
-                    {activeTab === 'rejected' && (
-                      <button onClick={() => handleApprove(artisan.id)} disabled={actionLoading === artisan.id} className="px-6 py-2 bg-forest-600 text-white font-medium rounded hover:bg-forest-700 flex items-center gap-2 disabled:opacity-50">
-                        Approve Now
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
-      
-      {/* Rejection Modal */}
-      {rejectionState.isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-earth-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
-            <div className="p-6">
-              <h3 className="font-serif text-xl font-bold text-earth-900 mb-2">Reject Application</h3>
-              <p className="text-sm text-earth-500 mb-4">Please provide a reason for rejecting this application.</p>
-              <textarea 
-                className="w-full border border-earth-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-500 resize-none h-24"
-                placeholder="Reason for rejection..."
-                value={rejectionState.reason}
-                onChange={(e) => setRejectionState({ ...rejectionState, reason: e.target.value })}
-              ></textarea>
-            </div>
-            <div className="bg-earth-50 p-4 border-t border-earth-100 flex justify-end gap-3">
-              <button 
-                onClick={() => setRejectionState({ isOpen: false, artisanId: null, reason: '' })}
-                className="px-4 py-2 text-earth-600 hover:bg-earth-100 rounded-lg text-sm font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={confirmReject}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
-              >
-                Reject Application
-              </button>
-            </div>
-          </div>
-        </div>
+
+      {/* DEDICATED ARTISAN REVIEW MODAL */}
+      {selectedArtisanForReview && (
+        <ArtisanReviewModal
+          isOpen={!!selectedArtisanForReview}
+          onClose={() => setSelectedArtisanForReview(null)}
+          artisan={selectedArtisanForReview}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          actionLoading={actionLoading}
+        />
       )}
     </div>
   );

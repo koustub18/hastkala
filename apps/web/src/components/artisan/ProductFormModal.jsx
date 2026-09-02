@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { IndianRupee, Sparkles, CheckCircle2, ChevronRight, X, Loader2, Upload, ImageIcon, Mic, Wand2, Calculator, Info, Camera, RefreshCw, Sun, MapPin, Layers, Package } from 'lucide-react';
 import { getPriceSuggestion, createNotification } from '@hastkala/core';
 import { useAuth } from '../../contexts/AuthContext';
+import { INDIAN_STATES } from '../../data/indianStates';
 
 const ProductFormModal = ({
   showModal,
@@ -990,14 +991,21 @@ const ProductFormModal = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-earth-700 uppercase tracking-wider mb-2">Craft Region / Origin</label>
-                  <input
-                    type="text"
-                    value={newProduct.region || ''}
-                    onChange={e => setNewProduct(p => ({ ...p, region: e.target.value }))}
+                  <label className="block text-xs font-bold text-earth-700 uppercase tracking-wider mb-2">ORIGIN STATE *</label>
+                  <select
+                    required
+                    value={newProduct.originState || newProduct.region || ''}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setNewProduct(p => ({ ...p, originState: val, region: val }));
+                    }}
                     className="w-full px-4 py-3 bg-earth-50 border border-earth-200 rounded-lg focus:outline-none focus:border-terracotta-500 focus:ring-1 focus:ring-terracotta-500"
-                    placeholder="e.g., Sambalpur, Odisha"
-                  />
+                  >
+                    <option value="" disabled>Select Origin State *</option>
+                    {INDIAN_STATES.map(st => (
+                      <option key={st} value={st}>{st}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-earth-700 uppercase tracking-wider mb-2">Primary Materials</label>
@@ -1007,6 +1015,27 @@ const ProductFormModal = ({
                     onChange={e => setNewProduct(p => ({ ...p, material: e.target.value }))}
                     className="w-full px-4 py-3 bg-earth-50 border border-earth-200 rounded-lg focus:outline-none focus:border-terracotta-500 focus:ring-1 focus:ring-terracotta-500"
                     placeholder="e.g., Natural Cotton, Terracotta Clay"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-earth-700 uppercase tracking-wider mb-2">INVENTORY / STOCK *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    required
+                    value={newProduct.stockQuantity !== undefined && newProduct.stockQuantity !== null ? newProduct.stockQuantity : ''}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === '') {
+                        setNewProduct(p => ({ ...p, stockQuantity: '' }));
+                      } else {
+                        const parsed = parseInt(val, 10);
+                        setNewProduct(p => ({ ...p, stockQuantity: isNaN(parsed) ? '' : Math.max(0, parsed) }));
+                      }
+                    }}
+                    className="w-full px-4 py-3 bg-earth-50 border border-earth-200 rounded-lg focus:outline-none focus:border-terracotta-500 focus:ring-1 focus:ring-terracotta-500"
+                    placeholder="Enter available quantity (e.g., 25)"
                   />
                 </div>
               </div>

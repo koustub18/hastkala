@@ -50,18 +50,34 @@ const ProductList = ({ products, startEditProduct, deleteProduct, openAddProduct
              <div className="flex flex-row md:flex-col gap-6 md:gap-1 text-xs text-earth-600">
                {product.material && <p className="uppercase tracking-wider">Material: <span className="font-bold text-earth-900">{product.material}</span></p>}
                {product.price && <p className="flex items-center gap-0.5 mt-1"><IndianRupee size={12} className="text-earth-500" /> <span className="text-base font-bold text-earth-900">{product.price}</span></p>}
+               <div className="mt-1">
+                 {product.stockQuantity === 0 ? (
+                   <span className="inline-block bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded text-[11px]">Stock: 0 — Out of Stock</span>
+                 ) : product.stockQuantity > 0 ? (
+                   <span className="inline-block bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded text-[11px]">Stock: {product.stockQuantity}</span>
+                 ) : (
+                   <span className="inline-block bg-earth-100 text-earth-600 font-medium px-2 py-0.5 rounded text-[11px]">Stock not set</span>
+                 )}
+               </div>
              </div>
              <div className="flex flex-row gap-3 md:flex-col md:gap-2">
                <button 
-                 onClick={() => startEditProduct(product)}
+                 onClick={(e) => {
+                   e.preventDefault();
+                   e.stopPropagation();
+                   startEditProduct(product);
+                 }}
                  className="flex-1 md:flex-none text-center text-earth-700 bg-white border border-earth-200 hover:bg-earth-50 hover:border-earth-300 font-bold uppercase tracking-wider text-[10px] px-4 py-2 rounded-lg transition-colors"
                >
                  Edit Listing
                </button>
                <button 
-                 onClick={() => {
+                 onClick={(e) => {
+                   e.preventDefault();
+                   e.stopPropagation();
+                   const prodId = product.id || product._id;
                    if (window.confirm("Are you sure you want to delete this product?")) {
-                     deleteProduct(product._id);
+                     deleteProduct(prodId);
                    }
                  }}
                  className="flex-1 md:flex-none text-center text-red-600 hover:bg-red-50 font-bold uppercase tracking-wider text-[10px] px-4 py-2 rounded-lg transition-colors"

@@ -22,6 +22,14 @@ export interface Product {
   image?: string;
   image2?: string;
   
+  // Origin & Regional Provenance
+  originState?: string;
+  region?: string;
+  state?: string;
+
+  // Inventory & Stock
+  stockQuantity?: number;
+  
   // Cost breakdown
   rawMaterialCost?: string | number;
   laborCost?: string | number;

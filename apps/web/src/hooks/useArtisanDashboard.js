@@ -23,6 +23,8 @@ const useArtisanDashboard = () => {
   const [newProduct, setNewProduct] = useState({
     title: '', category: CATEGORIES[0],
     material: '', description: '', 
+    originState: '', region: '',
+    stockQuantity: '',
     rawMaterialCost: '', laborCost: '', additionalCost: '',
     price: '', aiSuggestedPrice: null, priceRangeMin: null, priceRangeMax: null, aiPricingConfidence: '', aiPricingExplanation: '', aiPricingFactors: [], pricingUpdatedAt: null,
     image: '', image2: ''
@@ -210,20 +212,44 @@ const useArtisanDashboard = () => {
   const handleAddProduct = async (e) => {
     if (e) e.preventDefault();
     if (!userUid || !artisan) return;
+
+    const finalOriginState = (newProduct.originState || newProduct.region || '').trim();
+    if (!finalOriginState) {
+      toast.error('Origin State is required.');
+      return;
+    }
+
+    const stockVal = newProduct.stockQuantity;
+    const stockNum = typeof stockVal === 'number' ? stockVal : parseInt(stockVal, 10);
+    if (stockVal === '' || stockVal === undefined || stockVal === null || isNaN(stockNum) || stockNum < 0) {
+      toast.error('Inventory quantity is required.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
         const productData = {
           ...newProduct,
+          originState: finalOriginState,
+          region: newProduct.region || finalOriginState,
+          stockQuantity: stockNum,
           artisanId: userUid,
           artisanName: artisan.name,
         };
 
         if (isEditing) {
+          if (!editProductId) {
+            console.error('[EDIT PRODUCT] Missing editProductId when isEditing is true');
+            toast.error('Unable to update product: Product ID missing.');
+            setIsSubmitting(false);
+            return;
+          }
           await updateProduct(editProductId, productData);
-          setProducts(prev => prev.map(p => p._id === editProductId ? { _id: editProductId, ...productData } : p));
+          setProducts(prev => prev.map(p => (p._id === editProductId || p.id === editProductId) ? { ...p, ...productData, id: editProductId, _id: editProductId } : p));
         } else {
           const docRef = await createProduct(productData);
-          setProducts(prev => [...prev, { _id: docRef._id, ...productData }]);
+          const newId = docRef.id || docRef._id;
+          setProducts(prev => [...prev, { _id: newId, id: newId, ...productData }]);
         }
       
       setSubmitSuccess(true);
@@ -240,7 +266,9 @@ const useArtisanDashboard = () => {
         });
       }, 1500);
     } catch (err) {
-      console.error('Product operation failed:', err);
+      console.error('[EDIT/ADD PRODUCT ERROR]', err);
+      console.error('Firebase error code:', err?.code);
+      console.error('Firebase error message:', err?.message);
       toast.error('Failed to save product');
     } finally {
       setIsSubmitting(false);
@@ -248,10 +276,16 @@ const useArtisanDashboard = () => {
   };
 
   const deleteProduct = async (id) => {
+    if (!id) {
+      console.error('[DELETE PRODUCT] Product ID missing or undefined:', id);
+      toast.error('Unable to delete product: Product ID missing');
+      return;
+    }
+
     try {
-      const product = products.find(p => p._id === id);
+      const product = products.find(p => p._id === id || p.id === id);
       await serviceDeleteProduct(id);
-      setProducts(prev => prev.filter(p => p._id !== id));
+      setProducts(prev => prev.filter(p => p._id !== id && p.id !== id));
       toast.success('Product deleted');
       
       // Client-side best-effort image cleanup
@@ -272,8 +306,10 @@ const useArtisanDashboard = () => {
         }
       }
     } catch (err) {
-      console.error('Failed to delete product', err);
-      toast.error('Failed to delete product');
+      console.error('[DELETE PRODUCT ERROR]', err);
+      console.error('Firebase code:', err?.code);
+      console.error('Firebase message:', err?.message);
+      toast.error('Unable to delete product');
     }
   };
 
@@ -283,6 +319,8 @@ const useArtisanDashboard = () => {
     setNewProduct({
       title: '', category: CATEGORIES[0],
       material: '', description: '', 
+      originState: '', region: '',
+      stockQuantity: '',
       rawMaterialCost: '', laborCost: '', additionalCost: '',
       price: '', aiSuggestedPrice: null, priceRangeMin: null, priceRangeMax: null, aiPricingConfidence: '', aiPricingExplanation: '', aiPricingFactors: [], pricingUpdatedAt: null,
       image: '', image2: ''
@@ -291,17 +329,22 @@ const useArtisanDashboard = () => {
   };
 
   const startEditProduct = (prod) => {
-    if (!prod || !prod._id) {
+    const targetId = prod?.id || prod?._id;
+    if (!prod || !targetId) {
       openAddProductModal();
       return;
     }
     setIsEditing(true);
-    setEditProductId(prod._id);
+    setEditProductId(targetId);
+    const derivedOriginState = prod.originState || prod.state || prod.region || '';
     setNewProduct({
       title: prod.title || '',
       category: prod.category || CATEGORIES[0],
       material: prod.material || '',
       description: prod.description || '',
+      originState: derivedOriginState,
+      region: prod.region || derivedOriginState,
+      stockQuantity: prod.stockQuantity !== undefined && prod.stockQuantity !== null ? prod.stockQuantity : '',
       rawMaterialCost: prod.rawMaterialCost || '',
       laborCost: prod.laborCost || '',
       additionalCost: prod.additionalCost || '',
@@ -319,8 +362,21 @@ const useArtisanDashboard = () => {
     setShowModal(true);
   };
 
+  const refetchArtisan = async () => {
+    const currentUid = userUid || auth.currentUser?.uid;
+    if (!currentUid) return;
+    try {
+      const profile = await getArtisanProfile(currentUid);
+      if (profile) setArtisan(profile);
+    } catch (e) {
+      console.warn('Failed to refetch artisan profile:', e);
+    }
+  };
+
   return {
     artisan,
+    setArtisan,
+    refetchArtisan,
     products,
     isLoading,
     showModal,
@@ -339,7 +395,9 @@ const useArtisanDashboard = () => {
     startEditProduct,
     openAddProductModal,
     CATEGORIES,
-    enquiries
+    enquiries,
+    authStatus,
+    userUid
   };
 };
 

@@ -37,12 +37,30 @@ const ArtisanProfile = () => {
 
         {/* Artisan Header */}
         <div className="bg-white rounded-[2rem] overflow-hidden shadow-xl shadow-earth-900/5 mb-12 border border-earth-100/50">
-          <div className="h-48 bg-forest-900 relative">
-            <div className="absolute inset-0 bg-black/20"></div>
+          <div className="h-48 md:h-64 relative bg-earth-900 overflow-hidden">
+            {artisan.coverImage ? (
+              <img 
+                src={resolveImageUrl(artisan.coverImage)} 
+                alt={`${artisan.name || 'Artisan'} cover`} 
+                className="w-full h-full object-cover" 
+              />
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-r from-forest-900 via-earth-900 to-forest-900 opacity-90 relative">
+                <div className="absolute inset-0 bg-[radial-gradient(#d4a373_1px,transparent_1px)] [background-size:16px_16px] opacity-10" />
+              </div>
+            )}
           </div>
-          <div className="px-8 pb-8 pt-0 relative flex flex-col md:flex-row items-center md:items-end gap-6 -mt-16 md:-mt-12 text-center md:text-left">
-            <div className="w-32 h-32 rounded-full border-4 border-white bg-earth-50 flex flex-shrink-0 items-center justify-center text-earth-400 overflow-hidden relative z-10 shadow-xl">
-              <User size={48} />
+          <div className="px-8 pb-8 pt-0 relative flex flex-col md:flex-row items-center md:items-end gap-6 -mt-16 md:-mt-16 text-center md:text-left">
+            <div className="w-32 h-32 md:w-36 md:h-36 rounded-full border-4 border-white bg-earth-100 flex flex-shrink-0 items-center justify-center text-earth-400 overflow-hidden relative z-10 shadow-xl">
+              {artisan.profileImage ? (
+                <img 
+                  src={resolveImageUrl(artisan.profileImage)} 
+                  alt={artisan.name || 'Artisan'} 
+                  className="w-full h-full object-cover" 
+                />
+              ) : (
+                <User size={48} />
+              )}
             </div>
             <div className="flex-1 pb-2">
               <h1 className="text-3xl font-bold text-earth-900 font-serif mb-2">{artisan.name || 'Anonymous Artisan'}</h1>

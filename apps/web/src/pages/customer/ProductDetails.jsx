@@ -6,6 +6,7 @@ import { useProduct } from '../../hooks/useProduct';
 import toast from 'react-hot-toast';
 import { resolveImageUrl } from '../../utils/webImageUtils';
 import { createEnquiry } from '@hastkala/core';
+import { extractOriginState } from '../../data/indianStates';
 
 const ProductDetails = () => {
   const { productId } = useParams();
@@ -131,9 +132,18 @@ const ProductDetails = () => {
               </div>
 
               {product.material && (
-                <div className="mb-8">
+                <div className="mb-6">
                   <h3 className="text-sm font-semibold text-earth-500 uppercase tracking-wider mb-2">Materials Used</h3>
                   <p className="text-earth-900 font-medium">{product.material}</p>
+                </div>
+              )}
+
+              {extractOriginState(product) && (
+                <div className="mb-8">
+                  <h3 className="text-sm font-semibold text-earth-500 uppercase tracking-wider mb-2">Origin State</h3>
+                  <p className="text-earth-900 font-medium flex items-center gap-2">
+                    <MapPin size={16} className="text-terracotta-600" /> {extractOriginState(product)}
+                  </p>
                 </div>
               )}
 
@@ -142,14 +152,36 @@ const ProductDetails = () => {
                   <p className="text-sm font-semibold text-earth-500 uppercase tracking-wider mb-1">Price</p>
                   <p className="text-3xl font-bold text-forest-700">{product.price ? `₹${product.price}` : 'Price on request'}</p>
                 </div>
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-earth-500 uppercase tracking-wider mb-1">Availability</p>
+                  {product.stockQuantity === 0 ? (
+                    <span className="inline-block bg-red-100 text-red-700 font-bold px-3 py-1 rounded-full text-xs uppercase tracking-wider">
+                      📦 Out of Stock
+                    </span>
+                  ) : product.stockQuantity > 0 ? (
+                    <span className="inline-block bg-emerald-50 text-emerald-700 font-bold px-3 py-1 rounded-full text-xs uppercase tracking-wider">
+                      📦 {product.stockQuantity} available
+                    </span>
+                  ) : (
+                    <span className="inline-block bg-earth-100 text-earth-600 font-medium px-3 py-1 rounded-full text-xs uppercase tracking-wider">
+                      📦 Stock unavailable
+                    </span>
+                  )}
+                </div>
               </div>
 
-              <button 
-                onClick={() => setShowEnquiryForm(!showEnquiryForm)}
-                className="w-full bg-terracotta-600 hover:bg-terracotta-700 text-white py-4 px-8 rounded-full font-bold uppercase tracking-widest text-sm transition-all flex items-center justify-center gap-3 shadow-lg hover:shadow-xl hover:-translate-y-1"
-              >
-                <Mail size={20} /> Request to Purchase
-              </button>
+              {product.stockQuantity === 0 ? (
+                <div className="w-full bg-earth-200 text-earth-600 py-4 px-8 rounded-full font-bold uppercase tracking-widest text-sm text-center cursor-not-allowed">
+                  Item Currently Out of Stock
+                </div>
+              ) : (
+                <button 
+                  onClick={() => setShowEnquiryForm(!showEnquiryForm)}
+                  className="w-full bg-terracotta-600 hover:bg-terracotta-700 text-white py-4 px-8 rounded-full font-bold uppercase tracking-widest text-sm transition-all flex items-center justify-center gap-3 shadow-lg hover:shadow-xl hover:-translate-y-1"
+                >
+                  <Mail size={20} /> Request to Purchase
+                </button>
+              )}
 
               <AnimatePresence>
                 {showEnquiryForm && (

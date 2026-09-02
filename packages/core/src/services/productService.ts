@@ -14,14 +14,14 @@ export const getProducts = async (filters: { artisanId?: string; limit?: number 
   }
   
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+  return querySnapshot.docs.map(doc => ({ id: doc.id, _id: doc.id, ...doc.data() } as Product));
 };
 
 export const getProductById = async (id: string): Promise<Product | null> => {
   const docRef = doc(db, 'products', id);
   const docSnap = await getDoc(docRef);
   if (docSnap.exists()) {
-    return { id: docSnap.id, ...docSnap.data() } as Product;
+    return { id: docSnap.id, _id: docSnap.id, ...docSnap.data() } as Product;
   }
   return null;
 };
@@ -49,7 +49,13 @@ export const createProduct = async (productData: Partial<Product>): Promise<Prod
 
 export const updateProduct = async (id: string, productData: Partial<Product>): Promise<Product> => {
   const docRef = doc(db, 'products', id);
-  await updateDoc(docRef, productData);
+  
+  // Sanitize update payload: remove ONLY undefined fields
+  const sanitizedData = Object.fromEntries(
+    Object.entries(productData).filter(([_, value]) => value !== undefined)
+  );
+
+  await updateDoc(docRef, sanitizedData);
   
   if (auth.currentUser?.uid) {
     createNotification({
@@ -61,7 +67,7 @@ export const updateProduct = async (id: string, productData: Partial<Product>): 
     });
   }
   
-  return { _id: id, id, ...productData } as Product;
+  return { _id: id, id, ...sanitizedData } as Product;
 };
 
 export const deleteProduct = async (id: string): Promise<string> => {

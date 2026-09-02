@@ -63,7 +63,7 @@ const Navbar = () => {
           >
             <img src="/logo.jpeg" alt="Hastkala Logo" className="w-full h-full object-cover" />
           </motion.div>
-          <span className={`font-serif text-2xl font-bold tracking-widest uppercase transition-colors duration-500 ${(isScrolled || !isHomePage) ? 'text-earth-900' : 'text-white'}`}>
+          <span className={`font-serif text-2xl font-semibold tracking-wide transition-colors duration-500 ${(isScrolled || !isHomePage) ? 'text-earth-900' : 'text-white'}`}>
             Hastkala
           </span>
         </Link>
@@ -74,9 +74,9 @@ const Navbar = () => {
             <Link
               key={link.name}
               to={link.path}
-              className={`text-[13px] font-bold tracking-widest uppercase transition-colors relative group py-2 ${
+              className={`font-sans text-[13px] font-medium tracking-wide uppercase transition-colors relative group py-2 ${
                 location.pathname === link.path 
-                  ? ((isScrolled || !isHomePage) ? 'text-earth-900' : 'text-white') 
+                  ? ((isScrolled || !isHomePage) ? 'text-earth-900 font-semibold' : 'text-white font-semibold') 
                   : ((isScrolled || !isHomePage) ? 'text-earth-500 hover:text-earth-900' : 'text-white/70 hover:text-white')
               }`}
             >
@@ -109,7 +109,7 @@ const Navbar = () => {
           {userRole ? (
             <button 
               onClick={handleLogout}
-              className={`text-[11px] font-bold uppercase tracking-widest px-4 py-2 rounded-full border transition-all ${
+              className={`font-sans text-xs font-semibold uppercase tracking-wide px-4 py-2 rounded-full border transition-all ${
                 (isScrolled || !isHomePage)
                   ? 'border-terracotta-200 text-terracotta-600 hover:bg-terracotta-50' 
                   : 'border-white/30 text-white hover:bg-white/10'
@@ -120,7 +120,7 @@ const Navbar = () => {
           ) : (
             <Link 
               to="/login"
-              className={`text-[11px] font-bold uppercase tracking-widest px-6 py-2.5 rounded-full transition-all shadow-md hover:shadow-lg ${
+              className={`font-sans text-xs font-semibold uppercase tracking-wide px-6 py-2.5 rounded-full transition-all shadow-md hover:shadow-lg ${
                 (isScrolled || !isHomePage)
                   ? 'bg-terracotta-600 text-white hover:bg-terracotta-700' 
                   : 'bg-white text-earth-900 hover:bg-earth-50'
