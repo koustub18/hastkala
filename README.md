@@ -46,6 +46,21 @@ HastKala empowers traditional Indian artisans by providing a voice-first digital
 
 ## 🏗️ System Architecture & Workflow
 
+```mermaid
+flowchart LR
+    A[React/Expo Client] -->|Auth & DB| B[(Firebase)]
+    A -->|Media Uploads| C[Node.js Express Gateway]
+    C -->|Proxy API| D[Python FastAPI Service]
+    
+    subgraph AI Microservice
+        D --> E[Voice Pipeline: ASR ➔ MyMemory ➔ Groq]
+        D --> F[Image Pipeline: NAFNet ➔ OpenCV ➔ RMBG-2.0]
+    end
+    
+    E --> A
+    F --> A
+```
+
 **Workflow:**
 1. **Client Interaction:** Artisan/Buyer interacts with the React web interface.
 2. **Auth & State:** Firebase handles all role-based authentication and NoSQL data storage (Firestore).
